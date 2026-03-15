@@ -18,7 +18,7 @@ That makes local tool discovery noisy for both people and agents. `cmdatlas` pro
 - search by name, summary, help text, flags, or subcommands
 - inspect one stored command without reprobeing the tool
 - export the atlas as JSON
-- generate shell completion scripts for bash, zsh, fish, and PowerShell
+- generate or install shell completion scripts for bash, zsh, fish, and PowerShell
 
 ## Install
 
@@ -75,6 +75,15 @@ cmdatlas completion bash
 cmdatlas completion zsh
 cmdatlas completion fish
 cmdatlas completion powershell
+```
+
+Or install completion into your user config directory:
+
+```bash
+cmdatlas completion install bash
+cmdatlas completion install zsh
+cmdatlas completion install fish
+cmdatlas completion install powershell
 ```
 
 The index is persisted at:
@@ -158,6 +167,7 @@ This keeps the binary small and the behavior predictable, but the parser will no
 - Latest release: `v0.3.0`
 - Stable local indexing/search/show/export flow is working.
 - JSON output now makes `search` and `show` easier to consume from scripts and agents.
+- Completion install helpers now put generated scripts into standard per-user config locations.
 
 v0 ships these commands:
 
@@ -166,6 +176,7 @@ v0 ships these commands:
 - `cmdatlas show [--json] COMMAND`
 - `cmdatlas export --json`
 - `cmdatlas completion [bash|zsh|fish|powershell]`
+- `cmdatlas completion install [bash|zsh|fish|powershell]`
 
 Covered by tests:
 
@@ -179,10 +190,10 @@ Covered by tests:
 
 - richer subcommand graphing with nested command paths
 - re-scan diffing and stale-command detection
-- install helpers for shell completion setup
 - optional aliases, tags, and notes per command
 - smarter parser strategies for popular CLIs
-- next likely UX step: install helpers for shell completion setup so the generated scripts are one command away from use
+- shell-specific activation hints and profile wiring for completion install
+- next likely UX step: command aliases/tags/notes so teams and agents can layer local semantics on top of raw help output
 
 ## License
 

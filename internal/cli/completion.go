@@ -9,8 +9,16 @@ import (
 )
 
 func runCompletion(args []string, stdout io.Writer) error {
+	if len(args) == 2 && strings.EqualFold(strings.TrimSpace(args[0]), "install") {
+		message, err := writeCompletionInstall(args[1])
+		if err != nil {
+			return err
+		}
+		_, err = io.WriteString(stdout, message+"\n")
+		return err
+	}
 	if len(args) != 1 {
-		return errors.New("usage: cmdatlas completion [bash|zsh|fish|powershell]")
+		return errors.New("usage: cmdatlas completion [bash|zsh|fish|powershell]\n       cmdatlas completion install [bash|zsh|fish|powershell]")
 	}
 
 	shell := strings.ToLower(strings.TrimSpace(args[0]))

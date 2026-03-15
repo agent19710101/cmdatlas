@@ -249,4 +249,5 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  cmdatlas show [--json] COMMAND")
 	fmt.Fprintln(w, "  cmdatlas export --json")
 	fmt.Fprintln(w, "  cmdatlas completion [bash|zsh|fish|powershell]")
+	fmt.Fprintln(w, "  cmdatlas completion install [bash|zsh|fish|powershell]")
 }

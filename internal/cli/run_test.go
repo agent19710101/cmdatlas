@@ -56,6 +56,31 @@ func TestRunCompletionRejectsUnsupportedShell(t *testing.T) {
 	}
 }
 
+func TestRunCompletionInstallWritesScript(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"completion", "install", "bash"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	installedPath := filepath.Join(configHome, "bash_completion.d", "cmdatlas")
+	data, err := os.ReadFile(installedPath)
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	got := string(data)
+	for _, want := range []string{"complete -F _cmdatlas_completion cmdatlas", "show|export", "--json"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected installed completion script to contain %q, got %q", want, got)
+		}
+	}
+	if !strings.Contains(stdout.String(), installedPath) {
+		t.Fatalf("expected install output to mention %s, got %q", installedPath, stdout.String())
+	}
+}
+
 func TestRunShowUsesIndexedCommandNamesForCompletionScript(t *testing.T) {
 	configHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", configHome)
