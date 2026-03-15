@@ -279,7 +279,7 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
-- Latest release: `v0.17.1`
+- Latest release: `v0.17.2`
 - Stable local indexing/search/show/export flow is working.
 - `cmdatlas scan` now reports added, updated, unchanged, and stale commands so humans and agents can see what changed between rescans.
 - `cmdatlas scan` now preserves saved custom profiles instead of dropping them on rescan.
@@ -336,7 +336,16 @@ Covered by tests:
 
 ## Release Plan
 
-- `v0.17.x` — expand parser coverage beyond the initial nested-command allowlist and improve help-layout handling.
+Release order for local/manual publishes:
+
+1. update README status/release notes first
+2. run `python3 scripts/verify_release_readme.py --version vX.Y.Z` locally
+3. commit and push the README/code changes
+4. create the tag and GitHub release only after the verification passes
+
+Planned release themes:
+
+- `v0.17.x` — expand parser coverage beyond the initial nested-command allowlist, improve help-layout handling, and harden release guardrails.
 - `v0.18.x` — scan-history snapshots and change-aware automation hooks for agent workflows.
 - `v0.19.x` — richer warning categorization and profile-diff ergonomics for shared team workflows.
 
