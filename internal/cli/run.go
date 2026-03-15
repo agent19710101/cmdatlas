@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -33,6 +34,10 @@ type scanSummary struct {
 	Updated   []string `json:"updated"`
 	Unchanged []string `json:"unchanged"`
 	Stale     []string `json:"stale"`
+}
+
+type profilesJSONExport struct {
+	Profiles map[string][]string `json:"profiles"`
 }
 
 func Run(args []string, stdout, stderr io.Writer) error {
@@ -347,7 +352,7 @@ func runAnnotate(args []string, stdout io.Writer) error {
 
 func runProfiles(args []string, stdout io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: cmdatlas profiles [list|set|delete] ...")
+		return errors.New("usage: cmdatlas profiles [list|set|add|remove|delete|export|import] ...")
 	}
 	indexPath, err := atlas.DefaultIndexPath()
 	if err != nil {
@@ -429,9 +434,103 @@ func runProfiles(args []string, stdout io.Writer) error {
 		fmt.Fprintf(stdout, "Deleted profile %s\n", name)
 		fmt.Fprintf(stdout, "Saved index: %s\n", indexPath)
 		return nil
+	case "export":
+		return runProfilesExport(index, args[1:], stdout)
+	case "import":
+		return runProfilesImport(indexPath, index, args[1:], stdout)
 	default:
 		return fmt.Errorf("unknown profiles command %q", args[0])
 	}
+}
+
+func runProfilesExport(index atlas.Index, args []string, stdout io.Writer) error {
+	var jsonOutput bool
+	var names []string
+	for _, arg := range args {
+		if strings.TrimSpace(arg) == "--json" {
+			jsonOutput = true
+			continue
+		}
+		if strings.HasPrefix(strings.TrimSpace(arg), "-") {
+			return errors.New("usage: cmdatlas profiles export [NAME] --json")
+		}
+		names = append(names, arg)
+	}
+	if !jsonOutput || len(names) > 1 {
+		return errors.New("usage: cmdatlas profiles export [NAME] --json")
+	}
+
+	exported := map[string][]string{}
+	if len(names) == 1 {
+		name := strings.ToLower(strings.TrimSpace(names[0]))
+		commands, ok := index.Profiles[name]
+		if !ok {
+			return fmt.Errorf("profile %q does not exist", name)
+		}
+		exported[name] = append([]string(nil), commands...)
+	} else {
+		for name, commands := range index.Profiles {
+			exported[name] = append([]string(nil), commands...)
+		}
+	}
+	return writeJSON(stdout, profilesJSONExport{Profiles: exported})
+}
+
+func runProfilesImport(indexPath string, index atlas.Index, args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("profiles import", flag.ContinueOnError)
+	filePath := fs.String("file", "", "read profile JSON from file (defaults to stdin)")
+	replace := fs.Bool("replace", false, "replace existing custom profiles before import")
+	fs.SetOutput(io.Discard)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if len(fs.Args()) != 0 {
+		return errors.New("usage: cmdatlas profiles import [--replace] [--file PATH]")
+	}
+
+	data, err := readProfilesImportData(*filePath)
+	if err != nil {
+		return err
+	}
+	var payload profilesJSONExport
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return fmt.Errorf("decode profile import: %w", err)
+	}
+	if len(payload.Profiles) == 0 {
+		return errors.New("import requires at least one profile")
+	}
+
+	if *replace {
+		index.Profiles = nil
+	}
+	importedNames := make([]string, 0, len(payload.Profiles))
+	for name, commands := range payload.Profiles {
+		var setErr error
+		index, setErr = atlas.SetProfile(index, name, commands)
+		if setErr != nil {
+			return setErr
+		}
+		importedNames = append(importedNames, strings.ToLower(strings.TrimSpace(name)))
+	}
+	sort.Strings(importedNames)
+	if err := atlas.Save(indexPath, index); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "Imported profiles: %s\n", strings.Join(importedNames, ", "))
+	if *replace {
+		fmt.Fprintf(stdout, "Mode: replace\n")
+	} else {
+		fmt.Fprintf(stdout, "Mode: merge\n")
+	}
+	fmt.Fprintf(stdout, "Saved index: %s\n", indexPath)
+	return nil
+}
+
+func readProfilesImportData(filePath string) ([]byte, error) {
+	if strings.TrimSpace(filePath) == "" {
+		return io.ReadAll(os.Stdin)
+	}
+	return os.ReadFile(filePath)
 }
 
 func runExport(args []string, stdout io.Writer) error {
@@ -554,6 +653,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  cmdatlas profiles add NAME COMMAND [COMMAND ...]")
 	fmt.Fprintln(w, "  cmdatlas profiles remove NAME COMMAND [COMMAND ...]")
 	fmt.Fprintln(w, "  cmdatlas profiles delete NAME")
+	fmt.Fprintln(w, "  cmdatlas profiles export [NAME] --json")
+	fmt.Fprintln(w, "  cmdatlas profiles import [--replace] [--file PATH]")
 	fmt.Fprintln(w, "  cmdatlas export --json")
 	fmt.Fprintln(w, "  cmdatlas completion [bash|zsh|fish|powershell]")
 	fmt.Fprintln(w, "  cmdatlas completion install [bash|zsh|fish|powershell]")

@@ -95,6 +95,20 @@ cmdatlas profiles list
 cmdatlas scan --profile team
 ```
 
+Export one or more custom profiles for another machine or teammate:
+
+```bash
+cmdatlas profiles export --json
+cmdatlas profiles export team --json
+```
+
+Import shared profiles from a file or stdin:
+
+```bash
+cmdatlas profiles import --file profiles.json
+cat profiles.json | cmdatlas profiles import --replace
+```
+
 Export the stored index:
 
 ```bash
@@ -258,11 +272,12 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
-- Latest release: `v0.13.0`
+- Latest release: `v0.14.0`
 - Stable local indexing/search/show/export flow is working.
 - `cmdatlas scan` now reports added, updated, unchanged, and stale commands so humans and agents can see what changed between rescans.
 - `cmdatlas scan` now preserves saved custom profiles instead of dropping them on rescan.
 - `cmdatlas profiles set NAME ...`, `profiles add NAME ...`, `profiles remove NAME ...`, `profiles list`, and `profiles delete NAME` support persistent reusable local scan profiles on top of the built-in `default`, `dev`, `ops`, and `shell` sets.
+- `cmdatlas profiles export [NAME] --json` and `profiles import [--replace] [--file PATH]` make custom profile sharing and machine bootstrap flows scriptable.
 - `cmdatlas scan --profile NAME` works with both built-in profiles and custom local profiles for repeatable machine- or team-specific scans.
 - `cmdatlas scan --json` exposes scanned docs plus diff buckets for scripts and agents.
 - Machine-readable `warning_details` now classify skipped scan targets like missing binaries versus probe failures, so scripts and agents can react without string parsing.
@@ -283,6 +298,8 @@ v0 ships these commands:
 - `cmdatlas profiles add NAME COMMAND [COMMAND ...]`
 - `cmdatlas profiles remove NAME COMMAND [COMMAND ...]`
 - `cmdatlas profiles delete NAME`
+- `cmdatlas profiles export [NAME] --json`
+- `cmdatlas profiles import [--replace] [--file PATH]`
 - `cmdatlas export --json`
 - `cmdatlas completion [bash|zsh|fish|powershell]`
 - `cmdatlas completion install [bash|zsh|fish|powershell]`
@@ -297,7 +314,7 @@ Covered by tests:
 - scan diff/stale reporting across rescans
 - JSON output for `scan`, `search`, and `show`, including structured scan warning details
 - built-in and custom scan-profile selection plus completion suggestions for profile names
-- custom profile create/add/remove/list/delete flows and persistence in the local atlas store
+- custom profile create/add/remove/list/delete/export/import flows and persistence in the local atlas store
 - completion script generation and unsupported-shell handling
 
 ## Roadmap
@@ -305,7 +322,7 @@ Covered by tests:
 - richer subcommand graphing with nested command paths
 - smarter parser strategies for popular CLIs
 - scan-history snapshots so agents can automate follow-up on atlas changes
-- next likely UX step: profile import/share flows and warning handling for more probe-failure categories
+- next likely UX step: richer warning categorization and profile provenance/merge conflict hints
 
 ## License
 

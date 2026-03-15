@@ -155,9 +155,9 @@ func TestRunCompletionScripts(t *testing.T) {
 		args []string
 		want []string
 	}{
-		{name: "bash", args: []string{"completion", "bash"}, want: []string{"complete -F _cmdatlas_completion cmdatlas", "bash zsh fish powershell", "--alias --tag --note", "scan|search|export", "profiles", "list set add remove delete", "--json --profile", "default", "dev", "ops", "shell"}},
-		{name: "zsh", args: []string{"completion", "zsh"}, want: []string{"#compdef cmdatlas", "annotate:add aliases, tags, and notes to an indexed command", "profiles:list, save, edit, or delete custom scan profiles", "scan:scan commands into the local atlas", "--json[emit JSON]", "--profile[scan a named command profile]", "list set add remove delete", "default", "dev", "ops", "shell"}},
-		{name: "fish", args: []string{"completion", "fish"}, want: []string{"complete -c cmdatlas", "__cmdatlas_index_commands", "-l alias -d 'add a local alias'", "__fish_seen_subcommand_from scan search export show", "-l json -d 'emit JSON'", "-l profile -d 'scan a named command profile'", "default", "dev", "ops", "shell", "__fish_seen_subcommand_from profiles' -a 'list set add remove delete'"}},
+		{name: "bash", args: []string{"completion", "bash"}, want: []string{"complete -F _cmdatlas_completion cmdatlas", "bash zsh fish powershell", "--alias --tag --note", "scan|search|export", "profiles", "list set add remove delete export import", "--json --profile", "default", "dev", "ops", "shell"}},
+		{name: "zsh", args: []string{"completion", "zsh"}, want: []string{"#compdef cmdatlas", "annotate:add aliases, tags, and notes to an indexed command", "profiles:list, save, edit, import, export, or delete custom scan profiles", "scan:scan commands into the local atlas", "--json[emit JSON]", "--profile[scan a named command profile]", "list set add remove delete export import", "default", "dev", "ops", "shell"}},
+		{name: "fish", args: []string{"completion", "fish"}, want: []string{"complete -c cmdatlas", "__cmdatlas_index_commands", "-l alias -d 'add a local alias'", "__fish_seen_subcommand_from scan search export show", "-l json -d 'emit JSON'", "-l profile -d 'scan a named command profile'", "default", "dev", "ops", "shell", "__fish_seen_subcommand_from profiles' -a 'list set add remove delete export import'"}},
 		{name: "powershell", args: []string{"completion", "powershell"}, want: []string{"Register-ArgumentCompleter", "Get-CmdAtlasIndexedCommands", "'scan'", "'profiles'", "'list', 'set', 'add', 'remove', 'delete'", "'--json', '--profile'", "$scanProfiles = @('default'", "'dev'", "'ops'", "'shell'"}},
 	}
 
@@ -218,6 +218,89 @@ func TestRunProfilesAddAndRemove(t *testing.T) {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("expected profiles remove output to contain %q, got %q", want, stdout.String())
 		}
+	}
+}
+
+func TestRunProfilesExportImport(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	if err := Run([]string{"profiles", "set", "team", "git", "go"}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("profiles set returned error: %v", err)
+	}
+	if err := Run([]string{"profiles", "set", "ops-extra", "gh", "kubectl"}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("profiles set returned error: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"profiles", "export", "team", "--json"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("profiles export returned error: %v", err)
+	}
+	for _, want := range []string{"\"profiles\": {", "\"team\": [", "\"git\"", "\"go\""} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected profiles export output to contain %q, got %q", want, stdout.String())
+		}
+	}
+	if strings.Contains(stdout.String(), "ops-extra") {
+		t.Fatalf("expected single-profile export to omit other profiles, got %q", stdout.String())
+	}
+
+	importPath := filepath.Join(t.TempDir(), "profiles.json")
+	payload := `{"profiles":{"shared":["gh","git"],"team":["git","go","make"]}}`
+	if err := os.WriteFile(importPath, []byte(payload), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	stdout.Reset()
+	if err := Run([]string{"profiles", "import", "--file", importPath}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("profiles import returned error: %v", err)
+	}
+	for _, want := range []string{"Imported profiles: shared, team", "Mode: merge"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected profiles import output to contain %q, got %q", want, stdout.String())
+		}
+	}
+
+	indexPath := filepath.Join(configHome, "cmdatlas", "index.json")
+	index, err := atlas.Load(indexPath)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if got := strings.Join(index.Profiles["team"], ","); got != "git,go,make" {
+		t.Fatalf("team profile after import = %q", got)
+	}
+	if got := strings.Join(index.Profiles["shared"], ","); got != "gh,git" {
+		t.Fatalf("shared profile after import = %q", got)
+	}
+
+	replacePayload := `{"profiles":{"fresh":["docker"]}}`
+	stdout.Reset()
+	origStdin := os.Stdin
+	defer func() { os.Stdin = origStdin }()
+	readFile, writeFile, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe returned error: %v", err)
+	}
+	if _, err := writeFile.WriteString(replacePayload); err != nil {
+		t.Fatalf("WriteString returned error: %v", err)
+	}
+	writeFile.Close()
+	os.Stdin = readFile
+	if err := Run([]string{"profiles", "import", "--replace"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("profiles import --replace returned error: %v", err)
+	}
+	for _, want := range []string{"Imported profiles: fresh", "Mode: replace"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected replace import output to contain %q, got %q", want, stdout.String())
+		}
+	}
+
+	index, err = atlas.Load(indexPath)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if len(index.Profiles) != 1 || strings.Join(index.Profiles["fresh"], ",") != "docker" {
+		t.Fatalf("profiles after replace import = %#v", index.Profiles)
 	}
 }
 
