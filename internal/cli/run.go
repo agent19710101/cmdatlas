@@ -27,6 +27,8 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		return runShow(args[1:], stdout)
 	case "export":
 		return runExport(args[1:], stdout)
+	case "completion":
+		return runCompletion(args[1:], stdout)
 	case "help", "-h", "--help":
 		printUsage(stdout)
 		return nil
@@ -218,4 +220,5 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  cmdatlas search QUERY")
 	fmt.Fprintln(w, "  cmdatlas show COMMAND")
 	fmt.Fprintln(w, "  cmdatlas export --json")
+	fmt.Fprintln(w, "  cmdatlas completion [bash|zsh|fish|powershell]")
 }

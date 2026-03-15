@@ -18,6 +18,7 @@ That makes local tool discovery noisy for both people and agents. `cmdatlas` pro
 - search by name, summary, help text, flags, or subcommands
 - inspect one stored command without reprobeing the tool
 - export the atlas as JSON
+- generate shell completion scripts for bash, zsh, fish, and PowerShell
 
 ## Install
 
@@ -64,6 +65,15 @@ Export the stored index:
 
 ```bash
 cmdatlas export --json
+```
+
+Generate a shell completion script:
+
+```bash
+cmdatlas completion bash
+cmdatlas completion zsh
+cmdatlas completion fish
+cmdatlas completion powershell
 ```
 
 The index is persisted at:
@@ -133,18 +143,20 @@ v0 ships these commands:
 - `cmdatlas search QUERY`
 - `cmdatlas show COMMAND`
 - `cmdatlas export --json`
+- `cmdatlas completion [bash|zsh|fish|powershell]`
 
 Covered by tests:
 
 - help text normalization and extraction heuristics
 - search ranking and lookup behavior
 - index save/load round trips
+- completion script generation and unsupported-shell handling
 
 ## Roadmap
 
 - richer subcommand graphing with nested command paths
-- shell completion output
 - re-scan diffing and stale-command detection
+- install helpers for shell completion setup
 - optional aliases, tags, and notes per command
 - smarter parser strategies for popular CLIs
 
