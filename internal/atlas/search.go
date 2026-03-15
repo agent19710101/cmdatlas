@@ -49,6 +49,24 @@ func scoreDoc(doc CommandDoc, query string) int {
 	if strings.Contains(strings.ToLower(doc.Summary), query) {
 		score += 20
 	}
+	for _, alias := range doc.Aliases {
+		alias = strings.ToLower(alias)
+		if alias == query {
+			score += 40
+		} else if strings.Contains(alias, query) {
+			score += 20
+		}
+	}
+	for _, tag := range doc.Tags {
+		if strings.Contains(strings.ToLower(tag), query) {
+			score += 25
+		}
+	}
+	for _, note := range doc.Notes {
+		if strings.Contains(strings.ToLower(note), query) {
+			score += 8
+		}
+	}
 	for _, line := range doc.HelpLines {
 		if strings.Contains(strings.ToLower(line), query) {
 			score += 5

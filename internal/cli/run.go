@@ -25,6 +25,8 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		return runSearch(args[1:], stdout)
 	case "show":
 		return runShow(args[1:], stdout)
+	case "annotate":
+		return runAnnotate(args[1:], stdout)
 	case "export":
 		return runExport(args[1:], stdout)
 	case "completion":
@@ -153,6 +155,19 @@ func runShow(args []string, stdout io.Writer) error {
 	fmt.Fprintf(stdout, "Probe: %s\n", doc.Probe)
 	fmt.Fprintf(stdout, "Scanned: %s\n", doc.ScannedAt.Format("2006-01-02 15:04:05 MST"))
 
+	if len(doc.Aliases) > 0 {
+		fmt.Fprintf(stdout, "Aliases: %s\n", strings.Join(doc.Aliases, ", "))
+	}
+	if len(doc.Tags) > 0 {
+		fmt.Fprintf(stdout, "Tags: %s\n", strings.Join(doc.Tags, ", "))
+	}
+	if len(doc.Notes) > 0 {
+		fmt.Fprintf(stdout, "Notes:\n")
+		for _, note := range doc.Notes {
+			fmt.Fprintf(stdout, "  - %s\n", note)
+		}
+	}
+
 	if len(doc.HelpLines) > 0 {
 		fmt.Fprintf(stdout, "\nHelp:\n")
 		for _, line := range doc.HelpLines {
@@ -171,6 +186,75 @@ func runShow(args []string, stdout io.Writer) error {
 			fmt.Fprintf(stdout, "  %s\t%s\n", sub.Name, sub.Summary)
 		}
 	}
+	return nil
+}
+
+type multiValue []string
+
+func (m *multiValue) String() string {
+	return strings.Join(*m, ",")
+}
+
+func (m *multiValue) Set(value string) error {
+	*m = append(*m, value)
+	return nil
+}
+
+func runAnnotate(args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("annotate", flag.ContinueOnError)
+	var aliases multiValue
+	var tags multiValue
+	var notes multiValue
+	fs.Var(&aliases, "alias", "add a local alias (repeatable or comma-separated)")
+	fs.Var(&tags, "tag", "add a local tag (repeatable or comma-separated)")
+	fs.Var(&notes, "note", "add a local note (repeatable)")
+	fs.SetOutput(io.Discard)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if len(fs.Args()) != 1 {
+		return errors.New("usage: cmdatlas annotate [--alias NAME] [--tag NAME] [--note TEXT] COMMAND")
+	}
+
+	commandName := fs.Args()[0]
+	aliasList := splitCSV(aliases)
+	tagList := splitCSV(tags)
+	noteList := dedupe([]string(notes))
+	if len(aliasList) == 0 && len(tagList) == 0 && len(noteList) == 0 {
+		return errors.New("annotate requires at least one --alias, --tag, or --note")
+	}
+
+	indexPath, err := atlas.DefaultIndexPath()
+	if err != nil {
+		return err
+	}
+	index, err := atlas.Load(indexPath)
+	if err != nil {
+		return err
+	}
+	index, err = atlas.SetAnnotations(index, commandName, aliasList, tagList, noteList)
+	if err != nil {
+		return err
+	}
+	if err := atlas.Save(indexPath, index); err != nil {
+		return err
+	}
+
+	updated, _ := atlas.Find(index, commandName)
+	fmt.Fprintf(stdout, "Updated %s\n", updated.Name)
+	if len(updated.Aliases) > 0 {
+		fmt.Fprintf(stdout, "Aliases: %s\n", strings.Join(updated.Aliases, ", "))
+	}
+	if len(updated.Tags) > 0 {
+		fmt.Fprintf(stdout, "Tags: %s\n", strings.Join(updated.Tags, ", "))
+	}
+	if len(updated.Notes) > 0 {
+		fmt.Fprintf(stdout, "Notes:\n")
+		for _, note := range updated.Notes {
+			fmt.Fprintf(stdout, "  - %s\n", note)
+		}
+	}
+	fmt.Fprintf(stdout, "Saved index: %s\n", indexPath)
 	return nil
 }
 
@@ -233,6 +317,16 @@ func dedupe(values []string) []string {
 	return out
 }
 
+func splitCSV(values []string) []string {
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		for _, part := range strings.Split(value, ",") {
+			parts = append(parts, part)
+		}
+	}
+	return dedupe(parts)
+}
+
 func firstNonEmpty(value string, fallback string) string {
 	if strings.TrimSpace(value) == "" {
 		return fallback
@@ -247,6 +341,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  cmdatlas scan [COMMAND ...]")
 	fmt.Fprintln(w, "  cmdatlas search [--json] QUERY")
 	fmt.Fprintln(w, "  cmdatlas show [--json] COMMAND")
+	fmt.Fprintln(w, "  cmdatlas annotate [--alias NAME] [--tag NAME] [--note TEXT] COMMAND")
 	fmt.Fprintln(w, "  cmdatlas export --json")
 	fmt.Fprintln(w, "  cmdatlas completion [bash|zsh|fish|powershell]")
 	fmt.Fprintln(w, "  cmdatlas completion install [bash|zsh|fish|powershell]")

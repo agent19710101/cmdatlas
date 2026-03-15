@@ -41,7 +41,7 @@ func runCompletion(args []string, stdout io.Writer) error {
 }
 
 func completionCommandNames() []string {
-	commands := []string{"scan", "search", "show", "export", "completion", "help"}
+	commands := []string{"annotate", "completion", "export", "help", "scan", "search", "show"}
 	sort.Strings(commands)
 	return commands
 }
@@ -89,6 +89,14 @@ _cmdatlas_completion() {
             fi
             return 0
             ;;
+        annotate)
+            if [[ "$cur" == --* ]]; then
+                COMPREPLY=( $(compgen -W "--alias --tag --note" -- "$cur") )
+            else
+                __cmdatlas_complete_show
+            fi
+            return 0
+            ;;
         search|export)
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
             return 0
@@ -103,6 +111,13 @@ _cmdatlas_completion() {
     case "${COMP_WORDS[1]}" in
         search|show|export)
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
+            ;;
+        annotate)
+            if [[ "$cur" == --* ]]; then
+                COMPREPLY=( $(compgen -W "--alias --tag --note" -- "$cur") )
+            else
+                __cmdatlas_complete_show
+            fi
             ;;
         *)
             COMPREPLY=()
@@ -142,6 +157,7 @@ _cmdatlas() {
     'scan:scan commands into the local atlas'
     'search:search the local atlas'
     'show:show one indexed command'
+    'annotate:add aliases, tags, and notes to an indexed command'
     'export:export the atlas as JSON'
     'completion:print shell completion scripts'
     'help:show help'
@@ -154,6 +170,14 @@ _cmdatlas() {
       ;;
     show)
       _arguments '--json[emit JSON]' '1:indexed command:_cmdatlas_index_commands'
+      return
+      ;;
+    annotate)
+      _arguments \
+        '--alias[add a local alias]:alias:' \
+        '--tag[add a local tag]:tag:' \
+        '--note[add a local note]:note:' \
+        '1:indexed command:_cmdatlas_index_commands'
       return
       ;;
     search|export)
@@ -173,6 +197,13 @@ _cmdatlas() {
       ;;
     show)
       _arguments '--json[emit JSON]' '1:indexed command:_cmdatlas_index_commands'
+      ;;
+    annotate)
+      _arguments \
+        '--alias[add a local alias]:alias:' \
+        '--tag[add a local tag]:tag:' \
+        '--note[add a local note]:note:' \
+        '1:indexed command:_cmdatlas_index_commands'
       ;;
   esac
 }
@@ -206,10 +237,13 @@ PY
     end
 end
 
-complete -c cmdatlas -f -n '__fish_use_subcommand' -a 'scan search show export completion help'
+complete -c cmdatlas -f -n '__fish_use_subcommand' -a 'scan search show annotate export completion help'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell'
-complete -c cmdatlas -f -n '__fish_seen_subcommand_from show' -a '(__cmdatlas_index_commands)'
+complete -c cmdatlas -f -n '__fish_seen_subcommand_from show annotate' -a '(__cmdatlas_index_commands)'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from search export show' -l json -d 'emit JSON'
+complete -c cmdatlas -f -n '__fish_seen_subcommand_from annotate' -l alias -d 'add a local alias'
+complete -c cmdatlas -f -n '__fish_seen_subcommand_from annotate' -l tag -d 'add a local tag'
+complete -c cmdatlas -f -n '__fish_seen_subcommand_from annotate' -l note -d 'add a local note'
 `
 }
 
@@ -218,7 +252,7 @@ func powershellCompletionScript() string {
     param($wordToComplete, $commandAst, $cursorPosition)
 
     $words = $commandAst.CommandElements | ForEach-Object { $_.Extent.Text }
-    $commands = @('scan', 'search', 'show', 'export', 'completion', 'help')
+    $commands = @('annotate', 'scan', 'search', 'show', 'export', 'completion', 'help')
 
     function Get-CmdAtlasIndexedCommands {
         if ($env:XDG_CONFIG_HOME) {
@@ -254,6 +288,17 @@ func powershellCompletionScript() string {
         'show' {
             if ($wordToComplete -like '--*') {
                 @('--json') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+                    [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+                }
+            } else {
+                Get-CmdAtlasIndexedCommands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+                    [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+                }
+            }
+        }
+        'annotate' {
+            if ($wordToComplete -like '--*') {
+                @('--alias', '--tag', '--note') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
                     [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
                 }
             } else {

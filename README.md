@@ -15,8 +15,9 @@ Shell environments accumulate dozens of useful binaries, but their help surfaces
 That makes local tool discovery noisy for both people and agents. `cmdatlas` provides one local index with a consistent interface:
 
 - scan selected commands or a curated safe shortlist from `PATH`
-- search by name, summary, help text, flags, or subcommands
+- search by name, summary, help text, flags, subcommands, aliases, tags, or notes
 - inspect one stored command without reprobeing the tool
+- add local aliases, tags, and notes on top of scanned command docs
 - export the atlas as JSON
 - generate or install shell completion scripts for bash, zsh, fish, and PowerShell
 
@@ -52,6 +53,7 @@ Search the local atlas:
 
 ```bash
 cmdatlas search version control
+cmdatlas search kubernetes
 cmdatlas search --json json
 ```
 
@@ -60,6 +62,14 @@ Inspect one indexed command:
 ```bash
 cmdatlas show git
 cmdatlas show --json git
+```
+
+Layer local team/agent context onto a scanned command:
+
+```bash
+cmdatlas annotate --alias vcs --tag team-tool --note "daily driver for repo work" git
+cmdatlas search team-tool
+cmdatlas show git
 ```
 
 Export the stored index:
@@ -116,12 +126,24 @@ go      Go is a tool for managing Go source code.
 Example show:
 
 ```bash
+$ cmdatlas annotate --alias vcs --tag team-tool --note "daily driver for repo work" git
+Updated git
+Aliases: vcs
+Tags: team-tool
+Notes:
+  - daily driver for repo work
+Saved index: /home/you/.config/cmdatlas/index.json
+
 $ cmdatlas show git
 Name: git
 Path: /usr/bin/git
 Summary: distributed version control system
 Probe: --help
 Scanned: 2026-03-15 10:42:11 UTC
+Aliases: vcs
+Tags: team-tool
+Notes:
+  - daily driver for repo work
 
 Help:
   usage: git [-v | --version] [-h | --help] ...
@@ -145,6 +167,9 @@ $ cmdatlas search --json version control
     "summary": "distributed version control system",
     "help_lines": ["usage: git [-v | --version] [-h | --help] ..."],
     "flags": [{"name": "--version"}, {"name": "--help"}],
+    "aliases": ["vcs"],
+    "tags": ["team-tool"],
+    "notes": ["daily driver for repo work"],
     "probe": "--help",
     "scanned_at": "2026-03-15T10:42:11Z"
   }
@@ -159,21 +184,24 @@ $ cmdatlas search --json version control
 - it probes help in this order: `--help`, `help`, `-h`
 - each probe is run with a timeout and output cap so a bad command cannot hang the scan
 - summaries, flags, and subcommands are best-effort extracts from the captured help text
+- aliases, tags, and notes are local metadata layered onto the stored index and preserved across rescans
 
 This keeps the binary small and the behavior predictable, but the parser will not perfectly understand every CLI.
 
 ## Current Status
 
-- Latest release: `v0.4.0`
+- Latest release: `v0.5.0`
 - Stable local indexing/search/show/export flow is working.
 - JSON output now makes `search` and `show` easier to consume from scripts and agents.
 - Completion install helpers now put generated scripts into standard per-user config locations.
+- Local aliases/tags/notes can now capture team semantics without reprobeing commands.
 
 v0 ships these commands:
 
 - `cmdatlas scan [COMMAND ...]`
 - `cmdatlas search [--json] QUERY`
 - `cmdatlas show [--json] COMMAND`
+- `cmdatlas annotate [--alias NAME] [--tag NAME] [--note TEXT] COMMAND`
 - `cmdatlas export --json`
 - `cmdatlas completion [bash|zsh|fish|powershell]`
 - `cmdatlas completion install [bash|zsh|fish|powershell]`
@@ -182,6 +210,7 @@ Covered by tests:
 
 - help text normalization and extraction heuristics
 - search ranking and lookup behavior
+- annotation normalization/persistence across rescans
 - index save/load round trips
 - JSON output for `search` and `show`
 - completion script generation and unsupported-shell handling
@@ -190,10 +219,9 @@ Covered by tests:
 
 - richer subcommand graphing with nested command paths
 - re-scan diffing and stale-command detection
-- optional aliases, tags, and notes per command
 - smarter parser strategies for popular CLIs
 - shell-specific activation hints and profile wiring for completion install
-- next likely UX step: command aliases/tags/notes so teams and agents can layer local semantics on top of raw help output
+- next likely UX step: lightweight stale-command/rescan diff output so agents can tell what changed between scans
 
 ## License
 

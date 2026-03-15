@@ -18,6 +18,9 @@ type CommandDoc struct {
 	HelpLines   []string     `json:"help_lines"`
 	Flags       []FlagDoc    `json:"flags,omitempty"`
 	Subcommands []Subcommand `json:"subcommands,omitempty"`
+	Aliases     []string     `json:"aliases,omitempty"`
+	Tags        []string     `json:"tags,omitempty"`
+	Notes       []string     `json:"notes,omitempty"`
 	Probe       string       `json:"probe"`
 	ScannedAt   time.Time    `json:"scanned_at"`
 }
