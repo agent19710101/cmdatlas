@@ -272,6 +272,7 @@ $ cmdatlas search --json version control
 - it probes help in this order: `--help`, `help`, `-h`
 - each probe is run with a timeout and output cap so a bad command cannot hang the scan
 - summaries, flags, and subcommands are best-effort extracts from the captured help text
+- for a small high-value CLI set (`git`, `gh`, `docker`, `kubectl`), `cmdatlas` also follows first-level help into nested command paths like `gh pr checks` or `git remote add`
 - aliases, tags, and notes are local metadata layered onto the stored index and preserved across rescans
 
 This keeps the binary small and the behavior predictable, but the parser will not perfectly understand every CLI.
@@ -287,6 +288,7 @@ This keeps the binary small and the behavior predictable, but the parser will no
 - `cmdatlas profiles export [NAME] --json` and `profiles import [--replace] [--file PATH]` now include optional provenance metadata plus conflict-aware import summaries, which makes custom profile sharing and machine bootstrap flows easier to trust.
 - `cmdatlas scan --profile NAME` works with both built-in profiles and custom local profiles for repeatable machine- or team-specific scans.
 - `cmdatlas scan --json` exposes scanned docs plus diff buckets for scripts and agents.
+- Nested subcommand extraction now follows a small high-value CLI set (`git`, `gh`, `docker`, `kubectl`) far enough to capture practical command paths like `gh pr checks` and `git remote add`.
 - Machine-readable `warning_details` now classify skipped scan targets like missing binaries versus probe failures, so scripts and agents can react without string parsing.
 - JSON output makes `search` and `show` easier to consume from scripts and agents.
 - Completion install helpers put generated scripts into standard per-user config locations and print shell-specific activation/profile wiring hints.
@@ -313,7 +315,7 @@ v0 ships these commands:
 
 Covered by tests:
 
-- help text normalization and extraction heuristics
+- help text normalization, extraction heuristics, and nested subcommand probing for a small allowlisted CLI set
 - search ranking and lookup behavior
 - annotation normalization/persistence across rescans
 - index save/load round trips
@@ -326,14 +328,14 @@ Covered by tests:
 
 ## Roadmap
 
-- richer subcommand graphing with nested command paths
-- smarter parser strategies for popular CLIs
+- expand nested command-graph coverage beyond the initial `git`/`gh`/`docker`/`kubectl` parser set
+- smarter parser strategies for additional popular CLIs and help layouts
 - scan-history snapshots so agents can automate follow-up on atlas changes
 - next likely UX step: richer warning categorization and profile-diff ergonomics for shared team workflows
 
 ## Release Plan
 
-- `v0.17.x` — richer parser strategies for popular CLIs plus deeper nested subcommand extraction.
+- `v0.17.x` — expand parser coverage beyond the initial nested-command allowlist and improve help-layout handling.
 - `v0.18.x` — scan-history snapshots and change-aware automation hooks for agent workflows.
 - `v0.19.x` — richer warning categorization and profile-diff ergonomics for shared team workflows.
 
