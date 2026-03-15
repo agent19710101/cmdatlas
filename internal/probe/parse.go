@@ -9,7 +9,9 @@ import (
 
 var (
 	flagTokenPattern   = regexp.MustCompile(`(--?[a-zA-Z0-9][a-zA-Z0-9-]*)`)
-	subHeadingPattern  = regexp.MustCompile(`(?i)^(available )?(commands|subcommands|management commands):\s*$`)
+	subHeadingPattern  = regexp.MustCompile(`(?i)^((available )?(commands|subcommands|management commands)|the commands are|these are .* commands.*):\s*$`)
+	subcommandPattern  = regexp.MustCompile(`^([a-zA-Z0-9][a-zA-Z0-9:_-]*)\s{2,}(.+)$`)
+	stopSectionPattern = regexp.MustCompile(`(?i)^(flags|options|examples|usage):\s*$`)
 	usagePrefixPattern = regexp.MustCompile(`(?i)^usage:\s*`)
 )
 
@@ -30,6 +32,22 @@ func normalizeLines(text string, limit int) []string {
 }
 
 func detectSummary(lines []string) string {
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if usagePrefixPattern.MatchString(trimmed) {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "[") || strings.HasPrefix(trimmed, "<") || strings.HasPrefix(trimmed, "-") {
+			continue
+		}
+		if strings.HasSuffix(trimmed, ":") && !strings.Contains(trimmed, " ") {
+			continue
+		}
+		return trimmed
+	}
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
@@ -86,24 +104,20 @@ func detectSubcommands(lines []string) []atlas.Subcommand {
 			continue
 		}
 		if inSection {
-			if strings.HasSuffix(trimmed, ":") && !strings.Contains(strings.ToLower(trimmed), "command") {
+			if stopSectionPattern.MatchString(trimmed) {
 				inSection = false
 				continue
 			}
-			fields := strings.Fields(trimmed)
-			if len(fields) == 0 {
+			matches := subcommandPattern.FindStringSubmatch(trimmed)
+			if len(matches) != 3 {
 				continue
 			}
-			name := fields[0]
-			if strings.HasPrefix(name, "-") {
-				continue
-			}
+			name := matches[1]
 			if _, ok := seen[name]; ok {
 				continue
 			}
 			seen[name] = struct{}{}
-			summary := strings.TrimSpace(strings.TrimPrefix(trimmed, name))
-			summary = strings.TrimLeft(summary, "- ")
+			summary := strings.TrimSpace(matches[2])
 			subs = append(subs, atlas.Subcommand{Name: name, Summary: summary})
 			continue
 		}

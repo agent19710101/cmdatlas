@@ -44,3 +44,31 @@ func TestDetectSummaryFallsBackGracefully(t *testing.T) {
 		t.Fatalf("detectSummary() = %q, want %q", got, "-h, --help show help")
 	}
 }
+
+func TestDetectSummarySkipsUsageContinuation(t *testing.T) {
+	lines := []string{
+		"usage: git [-v | --version]",
+		"[--exec-path=<path>] [--html-path]",
+		"These are common Git commands used in various situations:",
+	}
+	if got := detectSummary(lines); got != "These are common Git commands used in various situations:" {
+		t.Fatalf("detectSummary() = %q", got)
+	}
+}
+
+func TestDetectSubcommandsFromGoStyleHelp(t *testing.T) {
+	lines := []string{
+		"The commands are:",
+		"bug         start a bug report",
+		"build       compile packages and dependencies",
+		"Use \"go help <command>\" for more information about a command.",
+	}
+
+	subs := detectSubcommands(lines)
+	if len(subs) != 2 {
+		t.Fatalf("detectSubcommands() found %d subcommands, want 2", len(subs))
+	}
+	if subs[0].Name != "bug" || subs[1].Name != "build" {
+		t.Fatalf("unexpected subcommands: %#v", subs)
+	}
+}
