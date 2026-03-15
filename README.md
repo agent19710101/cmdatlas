@@ -103,6 +103,8 @@ cmdatlas completion install fish
 cmdatlas completion install powershell
 ```
 
+Each install command now prints shell-specific activation hints so you know what to source immediately and which profile/config file to update for future shells.
+
 The index is persisted at:
 
 ```text
@@ -230,12 +232,12 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
-- Latest release: `v0.7.0`
+- Latest release: `v0.8.0`
 - Stable local indexing/search/show/export flow is working.
 - `cmdatlas scan` now reports added, updated, unchanged, and stale commands so humans and agents can see what changed between rescans.
 - `cmdatlas scan --json` now exposes scanned docs plus diff buckets for scripts and agents.
 - JSON output now makes `search` and `show` easier to consume from scripts and agents.
-- Completion install helpers now put generated scripts into standard per-user config locations.
+- Completion install helpers now put generated scripts into standard per-user config locations and print shell-specific activation/profile wiring hints.
 - Index writes are now atomic, which reduces corruption risk if a save is interrupted.
 - GitHub Actions now validates formatting, tests, and build health on pushes, pull requests, and version tags.
 - Local aliases/tags/notes can now capture team semantics without reprobeing commands.
@@ -265,7 +267,6 @@ Covered by tests:
 
 - richer subcommand graphing with nested command paths
 - smarter parser strategies for popular CLIs
-- shell-specific activation hints and profile wiring for completion install
 - scan-history snapshots so agents can automate follow-up on atlas changes
 - next likely UX step: command filtering, scan profiles, or richer machine-readable scan warnings
 

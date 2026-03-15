@@ -148,8 +148,41 @@ func TestRunCompletionInstallWritesScript(t *testing.T) {
 			t.Fatalf("expected installed completion script to contain %q, got %q", want, got)
 		}
 	}
-	if !strings.Contains(stdout.String(), installedPath) {
-		t.Fatalf("expected install output to mention %s, got %q", installedPath, stdout.String())
+
+	message := stdout.String()
+	for _, want := range []string{
+		installedPath,
+		"Load now: source " + installedPath,
+		filepath.Join(configHome, "cmdatlas", "completion.bashrc"),
+		"[ -f " + installedPath + " ] && source " + installedPath,
+	} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("expected install output to contain %q, got %q", want, message)
+		}
+	}
+}
+
+func TestPreferredShellProfile(t *testing.T) {
+	configHome := "/tmp/cmdatlas-config"
+
+	if got := preferredShellProfile("bash", configHome); got != filepath.Join(configHome, "cmdatlas", "completion.bashrc") {
+		t.Fatalf("bash profile = %q", got)
+	}
+	if got := preferredShellProfile("zsh", configHome); got != filepath.Join(configHome, "cmdatlas", "completion.zshrc") {
+		t.Fatalf("zsh profile = %q", got)
+	}
+	if got := preferredShellProfile("fish", configHome); got != filepath.Join(configHome, "fish", "config.fish") {
+		t.Fatalf("fish profile = %q", got)
+	}
+	wantPowerShell := filepath.Join(configHome, "powershell", "Microsoft.PowerShell_profile.ps1")
+	if runtime.GOOS == "windows" {
+		wantPowerShell = filepath.Join(filepath.Dir(configHome), "Documents", "PowerShell", "Microsoft.PowerShell_profile.ps1")
+	}
+	if got := preferredShellProfile("powershell", configHome); got != wantPowerShell {
+		t.Fatalf("powershell profile = %q, want %q", got, wantPowerShell)
+	}
+	if got := preferredShellProfile("unknown", configHome); got != "" {
+		t.Fatalf("unknown profile = %q, want empty", got)
 	}
 }
 
