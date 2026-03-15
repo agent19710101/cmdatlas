@@ -43,12 +43,21 @@ func Merge(existing Index, docs []CommandDoc, scannedSet []string) Index {
 		}
 	}
 
+	var profileMeta map[string]ProfileMetadata
+	if len(existing.ProfileMeta) > 0 {
+		profileMeta = make(map[string]ProfileMetadata, len(existing.ProfileMeta))
+		for name, meta := range existing.ProfileMeta {
+			profileMeta[name] = meta
+		}
+	}
+
 	return Index{
-		Version:    CurrentIndexVersion,
-		Generated:  time.Now().UTC(),
-		Commands:   commands,
-		ScannedSet: scannedSet,
-		Profiles:   profiles,
+		Version:     CurrentIndexVersion,
+		Generated:   time.Now().UTC(),
+		Commands:    commands,
+		ScannedSet:  scannedSet,
+		Profiles:    profiles,
+		ProfileMeta: profileMeta,
 	}
 }
 

@@ -145,7 +145,15 @@ func SetProfile(index Index, name string, commands []string) (Index, error) {
 	if index.Profiles == nil {
 		index.Profiles = map[string][]string{}
 	}
+	if index.ProfileMeta == nil {
+		index.ProfileMeta = map[string]ProfileMetadata{}
+	}
 	index.Profiles[name] = commands
+	meta := index.ProfileMeta[name]
+	if meta.Origin == "" {
+		meta.Origin = "custom"
+	}
+	index.ProfileMeta[name] = meta
 	return index, nil
 }
 
@@ -161,6 +169,12 @@ func DeleteProfile(index Index, name string) (Index, error) {
 		return index, fmt.Errorf("profile %q does not exist", name)
 	}
 	delete(index.Profiles, name)
+	if index.ProfileMeta != nil {
+		delete(index.ProfileMeta, name)
+		if len(index.ProfileMeta) == 0 {
+			index.ProfileMeta = nil
+		}
+	}
 	if len(index.Profiles) == 0 {
 		index.Profiles = nil
 	}

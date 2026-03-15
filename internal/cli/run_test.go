@@ -246,6 +246,30 @@ func TestRunProfilesListShowsBuiltInAndCustomCommands(t *testing.T) {
 	}
 }
 
+func TestRunProfilesListShowsImportedSource(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	indexPath := filepath.Join(configHome, "cmdatlas", "index.json")
+	index := atlas.Index{
+		Version:  atlas.CurrentIndexVersion,
+		Profiles: map[string][]string{"shared": {"gh", "git"}},
+		ProfileMeta: map[string]atlas.ProfileMetadata{
+			"shared": {Origin: "imported", ImportedFrom: "profiles.json"},
+		},
+	}
+	if err := atlas.Save(indexPath, index); err != nil {
+		t.Fatalf("Save returned error: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"profiles", "list"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run(profiles list) returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "shared\timported (profiles.json)\tgh, git") {
+		t.Fatalf("expected imported profile source in list output, got %q", stdout.String())
+	}
+}
+
 func TestRunProfilesExportImport(t *testing.T) {
 	configHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", configHome)
@@ -261,7 +285,7 @@ func TestRunProfilesExportImport(t *testing.T) {
 	if err := Run([]string{"profiles", "export", "team", "--json"}, &stdout, &bytes.Buffer{}); err != nil {
 		t.Fatalf("profiles export returned error: %v", err)
 	}
-	for _, want := range []string{"\"profiles\": {", "\"team\": [", "\"git\"", "\"go\""} {
+	for _, want := range []string{"\"profiles\": {", "\"profile_meta\": {", "\"team\": [", "\"git\"", "\"go\"", "\"origin\": \"custom\"", "\"exported_at\":"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("expected profiles export output to contain %q, got %q", want, stdout.String())
 		}
@@ -280,7 +304,7 @@ func TestRunProfilesExportImport(t *testing.T) {
 	if err := Run([]string{"profiles", "import", "--file", importPath}, &stdout, &bytes.Buffer{}); err != nil {
 		t.Fatalf("profiles import returned error: %v", err)
 	}
-	for _, want := range []string{"Imported profiles: shared, team", "Mode: merge"} {
+	for _, want := range []string{"Imported profiles: shared, team", "Mode: merge", "shared: new shared profile", "team: merged over local definition"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("expected profiles import output to contain %q, got %q", want, stdout.String())
 		}
@@ -296,6 +320,12 @@ func TestRunProfilesExportImport(t *testing.T) {
 	}
 	if got := strings.Join(index.Profiles["shared"], ","); got != "gh,git" {
 		t.Fatalf("shared profile after import = %q", got)
+	}
+	if got := index.ProfileMeta["team"].Origin; got != "imported" {
+		t.Fatalf("team profile origin after import = %q", got)
+	}
+	if got := index.ProfileMeta["team"].ImportedFrom; got != importPath {
+		t.Fatalf("team profile imported_from after import = %q", got)
 	}
 
 	replacePayload := `{"profiles":{"fresh":["docker"]}}`
@@ -314,7 +344,7 @@ func TestRunProfilesExportImport(t *testing.T) {
 	if err := Run([]string{"profiles", "import", "--replace"}, &stdout, &bytes.Buffer{}); err != nil {
 		t.Fatalf("profiles import --replace returned error: %v", err)
 	}
-	for _, want := range []string{"Imported profiles: fresh", "Mode: replace"} {
+	for _, want := range []string{"Imported profiles: fresh", "Mode: replace", "fresh: replaced with shared definition from stdin"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("expected replace import output to contain %q, got %q", want, stdout.String())
 		}
@@ -326,6 +356,12 @@ func TestRunProfilesExportImport(t *testing.T) {
 	}
 	if len(index.Profiles) != 1 || strings.Join(index.Profiles["fresh"], ",") != "docker" {
 		t.Fatalf("profiles after replace import = %#v", index.Profiles)
+	}
+	if got := index.ProfileMeta["fresh"].Origin; got != "imported" {
+		t.Fatalf("fresh profile origin after replace import = %q", got)
+	}
+	if got := index.ProfileMeta["fresh"].ImportedFrom; got != "stdin" {
+		t.Fatalf("fresh profile imported_from after replace import = %q", got)
 	}
 }
 

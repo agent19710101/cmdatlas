@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/agent19710101/cmdatlas/internal/atlas"
 	"github.com/agent19710101/cmdatlas/internal/probe"
@@ -37,7 +38,16 @@ type scanSummary struct {
 }
 
 type profilesJSONExport struct {
-	Profiles map[string][]string `json:"profiles"`
+	Profiles    map[string][]string              `json:"profiles"`
+	ProfileMeta map[string]atlas.ProfileMetadata `json:"profile_meta,omitempty"`
+}
+
+type profileImportPlan struct {
+	Name       string
+	Action     string
+	Previous   []string
+	Incoming   []string
+	ImportedBy string
 }
 
 func Run(args []string, stdout, stderr io.Writer) error {
@@ -367,10 +377,7 @@ func runProfiles(args []string, stdout io.Writer) error {
 	case "list":
 		for _, name := range atlas.ProfileNames(index) {
 			commands, _ := atlas.RawCommandsForProfile(index, name)
-			source := "custom"
-			if atlas.IsBuiltInProfile(name) {
-				source = "built-in"
-			}
+			source := profileSourceLabel(index, name)
 			fmt.Fprintf(stdout, "%s\t%s\t%s\n", name, source, strings.Join(commands, ", "))
 		}
 		return nil
@@ -477,7 +484,16 @@ func runProfilesExport(index atlas.Index, args []string, stdout io.Writer) error
 			exported[name] = append([]string(nil), commands...)
 		}
 	}
-	return writeJSON(stdout, profilesJSONExport{Profiles: exported})
+	exportedMeta := map[string]atlas.ProfileMetadata{}
+	for name := range exported {
+		meta := index.ProfileMeta[name]
+		if meta.Origin == "" {
+			meta.Origin = "custom"
+		}
+		meta.ExportedAt = nowUTC()
+		exportedMeta[name] = meta
+	}
+	return writeJSON(stdout, profilesJSONExport{Profiles: exported, ProfileMeta: exportedMeta})
 }
 
 func runProfilesImport(indexPath string, index atlas.Index, args []string, stdout io.Writer) error {
@@ -504,19 +520,30 @@ func runProfilesImport(indexPath string, index atlas.Index, args []string, stdou
 		return errors.New("import requires at least one profile")
 	}
 
+	plan := buildProfileImportPlan(index, payload, *replace, sourceLabelForImport(*filePath))
 	if *replace {
 		index.Profiles = nil
+		index.ProfileMeta = nil
 	}
 	importedNames := make([]string, 0, len(payload.Profiles))
-	for name, commands := range payload.Profiles {
+	for _, step := range plan {
 		var setErr error
-		index, setErr = atlas.SetProfile(index, name, commands)
+		index, setErr = atlas.SetProfile(index, step.Name, step.Incoming)
 		if setErr != nil {
 			return setErr
 		}
-		importedNames = append(importedNames, strings.ToLower(strings.TrimSpace(name)))
+		if index.ProfileMeta == nil {
+			index.ProfileMeta = map[string]atlas.ProfileMetadata{}
+		}
+		meta := payload.ProfileMeta[step.Name]
+		if meta.Origin == "" {
+			meta.Origin = "imported"
+		}
+		meta.ImportedFrom = step.ImportedBy
+		meta.ImportedAt = nowUTC()
+		index.ProfileMeta[step.Name] = meta
+		importedNames = append(importedNames, step.Name)
 	}
-	sort.Strings(importedNames)
 	if err := atlas.Save(indexPath, index); err != nil {
 		return err
 	}
@@ -525,6 +552,9 @@ func runProfilesImport(indexPath string, index atlas.Index, args []string, stdou
 		fmt.Fprintf(stdout, "Mode: replace\n")
 	} else {
 		fmt.Fprintf(stdout, "Mode: merge\n")
+	}
+	for _, step := range plan {
+		fmt.Fprintf(stdout, "%s: %s\n", step.Name, describeProfileImportPlan(step))
 	}
 	fmt.Fprintf(stdout, "Saved index: %s\n", indexPath)
 	return nil
@@ -535,6 +565,71 @@ func readProfilesImportData(filePath string) ([]byte, error) {
 		return io.ReadAll(os.Stdin)
 	}
 	return os.ReadFile(filePath)
+}
+
+func buildProfileImportPlan(index atlas.Index, payload profilesJSONExport, replace bool, importedBy string) []profileImportPlan {
+	plans := make([]profileImportPlan, 0, len(payload.Profiles))
+	for name, commands := range payload.Profiles {
+		name = strings.ToLower(strings.TrimSpace(name))
+		incoming := append([]string(nil), commands...)
+		sort.Strings(incoming)
+		step := profileImportPlan{Name: name, Incoming: incoming, ImportedBy: importedBy}
+		if !replace {
+			step.Previous = append([]string(nil), index.Profiles[name]...)
+			sort.Strings(step.Previous)
+		}
+		switch {
+		case replace:
+			step.Action = "replace"
+		case len(step.Previous) == 0:
+			step.Action = "create"
+		case strings.Join(step.Previous, ",") == strings.Join(step.Incoming, ","):
+			step.Action = "unchanged"
+		default:
+			step.Action = "merge"
+		}
+		plans = append(plans, step)
+	}
+	sort.Slice(plans, func(i, j int) bool { return plans[i].Name < plans[j].Name })
+	return plans
+}
+
+func describeProfileImportPlan(plan profileImportPlan) string {
+	switch plan.Action {
+	case "create":
+		return fmt.Sprintf("new shared profile from %s (%s)", plan.ImportedBy, strings.Join(plan.Incoming, ", "))
+	case "unchanged":
+		return fmt.Sprintf("unchanged; local and imported definitions match (%s)", strings.Join(plan.Incoming, ", "))
+	case "replace":
+		return fmt.Sprintf("replaced with shared definition from %s (%s)", plan.ImportedBy, strings.Join(plan.Incoming, ", "))
+	default:
+		return fmt.Sprintf("merged over local definition; was [%s], now [%s]", strings.Join(plan.Previous, ", "), strings.Join(plan.Incoming, ", "))
+	}
+}
+
+func sourceLabelForImport(filePath string) string {
+	if strings.TrimSpace(filePath) == "" {
+		return "stdin"
+	}
+	return filePath
+}
+
+func profileSourceLabel(index atlas.Index, name string) string {
+	if atlas.IsBuiltInProfile(name) {
+		return "built-in"
+	}
+	meta := index.ProfileMeta[name]
+	if meta.Origin == "imported" {
+		if meta.ImportedFrom != "" {
+			return fmt.Sprintf("imported (%s)", meta.ImportedFrom)
+		}
+		return "imported"
+	}
+	return "custom"
+}
+
+func nowUTC() time.Time {
+	return time.Now().UTC()
 }
 
 func runExport(args []string, stdout io.Writer) error {

@@ -95,7 +95,7 @@ cmdatlas profiles list
 cmdatlas scan --profile team
 ```
 
-`cmdatlas profiles list` now labels profiles as `built-in` or `custom` and shows the full configured command set instead of only the commands currently found on `PATH`, so shared/team profile definitions are easier to audit.
+`cmdatlas profiles list` now labels profiles as `built-in`, `custom`, or `imported (...)` and shows the full configured command set instead of only the commands currently found on `PATH`, so shared/team profile definitions are easier to audit.
 
 Export one or more custom profiles for another machine or teammate:
 
@@ -104,12 +104,16 @@ cmdatlas profiles export --json
 cmdatlas profiles export team --json
 ```
 
+Exports now include optional profile provenance metadata alongside the command sets, while keeping the original `profiles` object intact for simple scripts.
+
 Import shared profiles from a file or stdin:
 
 ```bash
 cmdatlas profiles import --file profiles.json
 cat profiles.json | cmdatlas profiles import --replace
 ```
+
+Import output now tells you whether each incoming profile was created, merged over a different local definition, replaced, or left unchanged, so team-sharing flows are easier to trust.
 
 Export the stored index:
 
@@ -274,13 +278,13 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
-- Latest release: `v0.15.0`
+- Latest release: `v0.16.0`
 - Stable local indexing/search/show/export flow is working.
 - `cmdatlas scan` now reports added, updated, unchanged, and stale commands so humans and agents can see what changed between rescans.
 - `cmdatlas scan` now preserves saved custom profiles instead of dropping them on rescan.
 - `cmdatlas profiles set NAME ...`, `profiles add NAME ...`, `profiles remove NAME ...`, `profiles list`, and `profiles delete NAME` support persistent reusable local scan profiles on top of the built-in `default`, `dev`, `ops`, and `shell` sets.
-- `cmdatlas profiles list` now shows whether each profile is built-in or custom and keeps non-installed commands visible, which makes shared profile definitions easier to review before scanning on a new machine.
-- `cmdatlas profiles export [NAME] --json` and `profiles import [--replace] [--file PATH]` make custom profile sharing and machine bootstrap flows scriptable.
+- `cmdatlas profiles list` now shows whether each profile is built-in, custom, or imported (with source hints) and keeps non-installed commands visible, which makes shared profile definitions easier to review before scanning on a new machine.
+- `cmdatlas profiles export [NAME] --json` and `profiles import [--replace] [--file PATH]` now include optional provenance metadata plus conflict-aware import summaries, which makes custom profile sharing and machine bootstrap flows easier to trust.
 - `cmdatlas scan --profile NAME` works with both built-in profiles and custom local profiles for repeatable machine- or team-specific scans.
 - `cmdatlas scan --json` exposes scanned docs plus diff buckets for scripts and agents.
 - Machine-readable `warning_details` now classify skipped scan targets like missing binaries versus probe failures, so scripts and agents can react without string parsing.
@@ -325,13 +329,13 @@ Covered by tests:
 - richer subcommand graphing with nested command paths
 - smarter parser strategies for popular CLIs
 - scan-history snapshots so agents can automate follow-up on atlas changes
-- next likely UX step: richer warning categorization and profile provenance/merge conflict hints
+- next likely UX step: richer warning categorization and profile-diff ergonomics for shared team workflows
 
 ## Release Plan
 
-- `v0.16.x` — profile provenance and import conflict hints so shared team profiles are easier to review and merge safely.
 - `v0.17.x` — richer parser strategies for popular CLIs plus deeper nested subcommand extraction.
 - `v0.18.x` — scan-history snapshots and change-aware automation hooks for agent workflows.
+- `v0.19.x` — richer warning categorization and profile-diff ergonomics for shared team workflows.
 
 ## License
 
