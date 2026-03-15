@@ -279,7 +279,7 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
-- Latest release: `v0.16.0`
+- Latest release: `v0.17.1`
 - Stable local indexing/search/show/export flow is working.
 - `cmdatlas scan` now reports added, updated, unchanged, and stale commands so humans and agents can see what changed between rescans.
 - `cmdatlas scan` now preserves saved custom profiles instead of dropping them on rescan.
@@ -289,6 +289,7 @@ This keeps the binary small and the behavior predictable, but the parser will no
 - `cmdatlas scan --profile NAME` works with both built-in profiles and custom local profiles for repeatable machine- or team-specific scans.
 - `cmdatlas scan --json` exposes scanned docs plus diff buckets for scripts and agents.
 - Nested subcommand extraction now follows a small high-value CLI set (`git`, `gh`, `docker`, `kubectl`) far enough to capture practical command paths like `gh pr checks` and `git remote add`.
+- Explicit scan targets that point to executable paths containing spaces now probe correctly instead of being split into the wrong command/argument boundary.
 - Machine-readable `warning_details` now classify skipped scan targets like missing binaries versus probe failures, so scripts and agents can react without string parsing.
 - JSON output makes `search` and `show` easier to consume from scripts and agents.
 - Completion install helpers put generated scripts into standard per-user config locations and print shell-specific activation/profile wiring hints.
@@ -315,7 +316,7 @@ v0 ships these commands:
 
 Covered by tests:
 
-- help text normalization, extraction heuristics, and nested subcommand probing for a small allowlisted CLI set
+- help text normalization, extraction heuristics, nested subcommand probing for a small allowlisted CLI set, and explicit executable paths containing spaces
 - search ranking and lookup behavior
 - annotation normalization/persistence across rescans
 - index save/load round trips

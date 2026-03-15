@@ -60,6 +60,32 @@ func TestScanCommandDoesNotProbeNestedSubcommandsForOtherCLIs(t *testing.T) {
 	}
 }
 
+func TestScanCommandSupportsExecutablePathsWithSpaces(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture assumes unix-like environment")
+	}
+
+	binDir := filepath.Join(t.TempDir(), "bin with spaces")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	scriptPath := filepath.Join(binDir, "space tool")
+	writeDispatchCommand(t, scriptPath, map[string]string{
+		"": "Space Tool\n\nUsage:\n  space tool --help\n",
+	})
+
+	doc, err := ScanCommand(scriptPath)
+	if err != nil {
+		t.Fatalf("ScanCommand returned error for spaced path %q: %v", scriptPath, err)
+	}
+	if doc.Path != scriptPath {
+		t.Fatalf("expected scanned path %q, got %q", scriptPath, doc.Path)
+	}
+	if doc.Name != filepath.Base(scriptPath) {
+		t.Fatalf("expected scanned name %q, got %q", filepath.Base(scriptPath), doc.Name)
+	}
+}
+
 func joinSubcommandNames(subcommands []atlas.Subcommand) string {
 	parts := make([]string, 0, len(subcommands))
 	for _, sub := range subcommands {

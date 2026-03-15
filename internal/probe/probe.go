@@ -65,18 +65,16 @@ func ScanCommand(name string) (atlas.CommandDoc, error) {
 	}, nil
 }
 
-func collectHelp(command string) (string, string, error) {
-	parts := strings.Fields(strings.TrimSpace(command))
-	if len(parts) == 0 {
+func collectHelp(command string, baseArgs ...string) (string, string, error) {
+	command = strings.TrimSpace(command)
+	if command == "" {
 		return "", "", errors.New("empty command")
 	}
-	name := parts[0]
-	baseArgs := parts[1:]
 
 	var errs []string
 	for _, variant := range helpVariants {
 		args := append(append([]string(nil), baseArgs...), variant...)
-		out, err := run(name, args...)
+		out, err := run(command, args...)
 		if strings.TrimSpace(out) != "" {
 			return out, strings.Join(variant, " "), nil
 		}
@@ -109,7 +107,7 @@ func detectNestedSubcommands(name string, topLevel []atlas.Subcommand) []atlas.S
 			continue
 		}
 
-		output, _, err := collectHelp(strings.Join(append([]string{name}, pathParts...), " "))
+		output, _, err := collectHelp(name, pathParts...)
 		probes++
 		if err != nil {
 			continue
