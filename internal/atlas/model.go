@@ -5,10 +5,11 @@ import "time"
 const CurrentIndexVersion = 1
 
 type Index struct {
-	Version    int          `json:"version"`
-	Generated  time.Time    `json:"generated_at"`
-	Commands   []CommandDoc `json:"commands"`
-	ScannedSet []string     `json:"scanned_set,omitempty"`
+	Version    int                 `json:"version"`
+	Generated  time.Time           `json:"generated_at"`
+	Commands   []CommandDoc        `json:"commands"`
+	ScannedSet []string            `json:"scanned_set,omitempty"`
+	Profiles   map[string][]string `json:"profiles,omitempty"`
 }
 
 type CommandDoc struct {

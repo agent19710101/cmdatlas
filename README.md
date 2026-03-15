@@ -87,6 +87,14 @@ cmdatlas search team-tool
 cmdatlas show git
 ```
 
+Create a reusable custom scan profile for your machine or team:
+
+```bash
+cmdatlas profiles set team git gh go make
+cmdatlas profiles list
+cmdatlas scan --profile team
+```
+
 Export the stored index:
 
 ```bash
@@ -230,7 +238,7 @@ $ cmdatlas search --json version control
 
 `cmdatlas` intentionally uses simple heuristics and tight safety limits:
 
-- it only scans commands you name directly, a small curated default shortlist, or a named scan profile (`default`, `dev`, `ops`, `shell`)
+- it only scans commands you name directly, a small curated default shortlist, a built-in scan profile (`default`, `dev`, `ops`, `shell`), or a custom profile you save locally
 - it probes help in this order: `--help`, `help`, `-h`
 - each probe is run with a timeout and output cap so a bad command cannot hang the scan
 - summaries, flags, and subcommands are best-effort extracts from the captured help text
@@ -240,10 +248,11 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
-- Latest release: `v0.9.0`
+- Latest release: `v0.10.0`
 - Stable local indexing/search/show/export flow is working.
 - `cmdatlas scan` now reports added, updated, unchanged, and stale commands so humans and agents can see what changed between rescans.
-- `cmdatlas scan --profile NAME` now gives repeatable curated scan sets for common local contexts like dev, ops, and shell-heavy machines.
+- `cmdatlas profiles set NAME ...`, `profiles list`, and `profiles delete NAME` now let users save reusable local scan profiles on top of the built-in `default`, `dev`, `ops`, and `shell` sets.
+- `cmdatlas scan --profile NAME` now works with both built-in profiles and custom local profiles for repeatable machine- or team-specific scans.
 - `cmdatlas scan --json` now exposes scanned docs plus diff buckets for scripts and agents.
 - JSON output now makes `search` and `show` easier to consume from scripts and agents.
 - Completion install helpers now put generated scripts into standard per-user config locations and print shell-specific activation/profile wiring hints.
@@ -257,6 +266,9 @@ v0 ships these commands:
 - `cmdatlas search [--json] QUERY`
 - `cmdatlas show [--json] COMMAND`
 - `cmdatlas annotate [--alias NAME] [--tag NAME] [--note TEXT] COMMAND`
+- `cmdatlas profiles list`
+- `cmdatlas profiles set NAME COMMAND [COMMAND ...]`
+- `cmdatlas profiles delete NAME`
 - `cmdatlas export --json`
 - `cmdatlas completion [bash|zsh|fish|powershell]`
 - `cmdatlas completion install [bash|zsh|fish|powershell]`
@@ -270,7 +282,8 @@ Covered by tests:
 - atomic save failure preservation for the index store
 - scan diff/stale reporting across rescans
 - JSON output for `scan`, `search`, and `show`
-- named scan-profile selection and completion suggestions for profile names
+- built-in and custom scan-profile selection plus completion suggestions for profile names
+- custom profile create/list/delete flows and persistence in the local atlas store
 - completion script generation and unsupported-shell handling
 
 ## Roadmap
@@ -278,7 +291,7 @@ Covered by tests:
 - richer subcommand graphing with nested command paths
 - smarter parser strategies for popular CLIs
 - scan-history snapshots so agents can automate follow-up on atlas changes
-- next likely UX step: command filtering within profiles, custom user-defined profiles, or richer machine-readable scan warnings
+- next likely UX step: editing/merging profile contents without full replacement, plus richer machine-readable scan warnings
 
 ## License
 

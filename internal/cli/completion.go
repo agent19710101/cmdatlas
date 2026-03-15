@@ -43,14 +43,19 @@ func runCompletion(args []string, stdout io.Writer) error {
 }
 
 func completionCommandNames() []string {
-	commands := []string{"annotate", "completion", "export", "help", "scan", "search", "show"}
+	commands := []string{"annotate", "completion", "export", "help", "profiles", "scan", "search", "show"}
 	sort.Strings(commands)
 	return commands
 }
 
+func completionProfileNames() []string {
+	index, _ := loadIndex()
+	return atlas.ProfileNames(index)
+}
+
 func bashCompletionScript() string {
 	commands := strings.Join(completionCommandNames(), " ")
-	profiles := strings.Join(atlas.ProfileNames(), " ")
+	profiles := strings.Join(completionProfileNames(), " ")
 	return fmt.Sprintf(`# bash completion for cmdatlas
 __cmdatlas_complete_show() {
     local cur index_path
@@ -88,6 +93,10 @@ _cmdatlas_completion() {
             COMPREPLY=( $(compgen -W "%s" -- "$cur") )
             return 0
             ;;
+        profiles)
+            COMPREPLY=( $(compgen -W "list set delete" -- "$cur") )
+            return 0
+            ;;
         show)
             if [[ "$cur" == --* ]]; then
                 COMPREPLY=( $(compgen -W "--json" -- "$cur") )
@@ -122,6 +131,9 @@ _cmdatlas_completion() {
         search|show|export)
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
             ;;
+        profiles)
+            COMPREPLY=( $(compgen -W "list set delete" -- "$cur") )
+            ;;
         annotate)
             if [[ "$cur" == --* ]]; then
                 COMPREPLY=( $(compgen -W "--alias --tag --note" -- "$cur") )
@@ -140,7 +152,7 @@ complete -F _cmdatlas_completion cmdatlas
 }
 
 func zshCompletionScript() string {
-	profiles := atlas.ProfileNames()
+	profiles := completionProfileNames()
 	return fmt.Sprintf(`#compdef cmdatlas
 
 _cmdatlas_index_commands() {
@@ -169,6 +181,7 @@ _cmdatlas() {
     'search:search the local atlas'
     'show:show one indexed command'
     'annotate:add aliases, tags, and notes to an indexed command'
+    'profiles:list, save, or delete custom scan profiles'
     'export:export the atlas as JSON'
     'completion:print shell completion scripts'
     'help:show help'
@@ -181,6 +194,10 @@ _cmdatlas() {
       ;;
     scan)
       _arguments '--json[emit JSON]' '--profile[scan a named command profile]:profile:(%s)' '*:command:'
+      return
+      ;;
+    profiles)
+      _arguments '1:action:(list set delete)'
       return
       ;;
     show)
@@ -213,6 +230,9 @@ _cmdatlas() {
     search|export)
       _arguments '--json[emit JSON]'
       ;;
+    profiles)
+      _arguments '1:action:(list set delete)'
+      ;;
     show)
       _arguments '--json[emit JSON]' '1:indexed command:_cmdatlas_index_commands'
       ;;
@@ -231,7 +251,7 @@ _cmdatlas "$@"
 }
 
 func fishCompletionScript() string {
-	profiles := strings.Join(atlas.ProfileNames(), " ")
+	profiles := strings.Join(completionProfileNames(), " ")
 	return fmt.Sprintf(`function __cmdatlas_index_commands
     set -l index_path
     if set -q XDG_CONFIG_HOME
@@ -256,7 +276,7 @@ PY
     end
 end
 
-complete -c cmdatlas -f -n '__fish_use_subcommand' -a 'scan search show annotate export completion help'
+complete -c cmdatlas -f -n '__fish_use_subcommand' -a 'scan search show annotate profiles export completion help'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from show annotate' -a '(__cmdatlas_index_commands)'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from scan search export show' -l json -d 'emit JSON'
@@ -264,16 +284,17 @@ complete -c cmdatlas -f -n '__fish_seen_subcommand_from scan' -l profile -d 'sca
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from annotate' -l alias -d 'add a local alias'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from annotate' -l tag -d 'add a local tag'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from annotate' -l note -d 'add a local note'
+complete -c cmdatlas -f -n '__fish_seen_subcommand_from profiles' -a 'list set delete'
 `, profiles)
 }
 
 func powershellCompletionScript() string {
-	profiles := strings.Join(atlas.ProfileNames(), "', '")
+	profiles := strings.Join(completionProfileNames(), "', '")
 	return fmt.Sprintf(`Register-ArgumentCompleter -Native -CommandName cmdatlas -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
 
     $words = $commandAst.CommandElements | ForEach-Object { $_.Extent.Text }
-    $commands = @('annotate', 'scan', 'search', 'show', 'export', 'completion', 'help')
+    $commands = @('annotate', 'scan', 'search', 'show', 'profiles', 'export', 'completion', 'help')
     $scanProfiles = @('%s')
 
     function Get-CmdAtlasIndexedCommands {
@@ -347,6 +368,11 @@ func powershellCompletionScript() string {
         }
         'export' {
             @('--json') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+                [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+            }
+        }
+        'profiles' {
+            @('list', 'set', 'delete') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
                 [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
             }
         }

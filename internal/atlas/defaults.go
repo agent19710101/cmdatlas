@@ -30,7 +30,7 @@ var defaultCandidates = []string{
 	"curl",
 }
 
-var scanProfiles = map[string][]string{
+var builtInScanProfiles = map[string][]string{
 	DefaultProfileName: defaultCandidates,
 	"dev": {
 		"git",
@@ -68,16 +68,16 @@ var scanProfiles = map[string][]string{
 }
 
 func DefaultCommands() []string {
-	commands, _ := CommandsForProfile(DefaultProfileName)
+	commands, _ := CommandsForProfile(Index{}, DefaultProfileName)
 	return commands
 }
 
-func CommandsForProfile(name string) ([]string, error) {
-	key := strings.ToLower(strings.TrimSpace(name))
+func CommandsForProfile(index Index, name string) ([]string, error) {
+	key := normalizeProfileName(name)
 	if key == "" {
 		key = DefaultProfileName
 	}
-	candidates, ok := scanProfiles[key]
+	candidates, ok := profileCommands(index, key)
 	if !ok {
 		return nil, fmt.Errorf("unknown scan profile %q", name)
 	}
@@ -92,11 +92,93 @@ func CommandsForProfile(name string) ([]string, error) {
 	return found, nil
 }
 
-func ProfileNames() []string {
-	names := make([]string, 0, len(scanProfiles))
-	for name := range scanProfiles {
+func ProfileNames(index Index) []string {
+	names := make([]string, 0, len(builtInScanProfiles)+len(index.Profiles))
+	seen := map[string]struct{}{}
+	for name := range builtInScanProfiles {
+		names = append(names, name)
+		seen[name] = struct{}{}
+	}
+	for name := range index.Profiles {
+		name = normalizeProfileName(name)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	return names
+}
+
+func SetProfile(index Index, name string, commands []string) (Index, error) {
+	name = normalizeProfileName(name)
+	if name == "" {
+		return index, fmt.Errorf("profile name is required")
+	}
+	if name == DefaultProfileName {
+		return index, fmt.Errorf("profile %q is reserved", name)
+	}
+	commands = dedupeProfileCommands(commands)
+	if len(commands) == 0 {
+		return index, fmt.Errorf("profile %q requires at least one command", name)
+	}
+	if index.Profiles == nil {
+		index.Profiles = map[string][]string{}
+	}
+	index.Profiles[name] = commands
+	return index, nil
+}
+
+func DeleteProfile(index Index, name string) (Index, error) {
+	name = normalizeProfileName(name)
+	if name == "" {
+		return index, fmt.Errorf("profile name is required")
+	}
+	if _, ok := builtInScanProfiles[name]; ok {
+		return index, fmt.Errorf("built-in profile %q cannot be removed", name)
+	}
+	if _, ok := index.Profiles[name]; !ok {
+		return index, fmt.Errorf("profile %q does not exist", name)
+	}
+	delete(index.Profiles, name)
+	if len(index.Profiles) == 0 {
+		index.Profiles = nil
+	}
+	return index, nil
+}
+
+func profileCommands(index Index, name string) ([]string, bool) {
+	if commands, ok := builtInScanProfiles[name]; ok {
+		return commands, true
+	}
+	if index.Profiles == nil {
+		return nil, false
+	}
+	commands, ok := index.Profiles[name]
+	return dedupeProfileCommands(commands), ok
+}
+
+func normalizeProfileName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
+func dedupeProfileCommands(commands []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(commands))
+	for _, command := range commands {
+		command = strings.TrimSpace(command)
+		if command == "" {
+			continue
+		}
+		if _, ok := seen[command]; ok {
+			continue
+		}
+		seen[command] = struct{}{}
+		out = append(out, command)
+	}
+	sort.Strings(out)
+	return out
 }

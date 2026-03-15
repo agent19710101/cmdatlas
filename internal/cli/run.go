@@ -42,6 +42,8 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		return runShow(args[1:], stdout)
 	case "annotate":
 		return runAnnotate(args[1:], stdout)
+	case "profiles":
+		return runProfiles(args[1:], stdout)
 	case "export":
 		return runExport(args[1:], stdout)
 	case "completion":
@@ -69,11 +71,19 @@ func runScan(args []string, stdout io.Writer) error {
 		return errors.New("scan accepts either explicit COMMAND arguments or --profile, not both")
 	}
 
+	indexPath, err := atlas.DefaultIndexPath()
+	if err != nil {
+		return err
+	}
+	index, err := atlas.Load(indexPath)
+	if err != nil {
+		return err
+	}
+
 	targets := fs.Args()
 	if len(targets) == 0 {
 		selectedProfile := firstNonEmpty(strings.TrimSpace(*profile), atlas.DefaultProfileName)
-		var err error
-		targets, err = atlas.CommandsForProfile(selectedProfile)
+		targets, err = atlas.CommandsForProfile(index, selectedProfile)
 		if err != nil {
 			return err
 		}
@@ -83,14 +93,6 @@ func runScan(args []string, stdout io.Writer) error {
 	}
 	targets = dedupe(targets)
 
-	indexPath, err := atlas.DefaultIndexPath()
-	if err != nil {
-		return err
-	}
-	index, err := atlas.Load(indexPath)
-	if err != nil {
-		return err
-	}
 	previous := index
 	previousByName := map[string]atlas.CommandDoc{}
 	for _, doc := range previous.Commands {
@@ -171,7 +173,7 @@ func runScan(args []string, stdout io.Writer) error {
 	return nil
 }
 
-func runSearch(args []string, stdout io.Writer) error {
+func runSearch(args []string, stdout io.Writer) error { /* unchanged body */
 	fs := flag.NewFlagSet("search", flag.ContinueOnError)
 	jsonOutput := fs.Bool("json", false, "emit JSON")
 	fs.SetOutput(io.Discard)
@@ -265,14 +267,8 @@ func runShow(args []string, stdout io.Writer) error {
 
 type multiValue []string
 
-func (m *multiValue) String() string {
-	return strings.Join(*m, ",")
-}
-
-func (m *multiValue) Set(value string) error {
-	*m = append(*m, value)
-	return nil
-}
+func (m *multiValue) String() string         { return strings.Join(*m, ",") }
+func (m *multiValue) Set(value string) error { *m = append(*m, value); return nil }
 
 func runAnnotate(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("annotate", flag.ContinueOnError)
@@ -330,6 +326,60 @@ func runAnnotate(args []string, stdout io.Writer) error {
 	}
 	fmt.Fprintf(stdout, "Saved index: %s\n", indexPath)
 	return nil
+}
+
+func runProfiles(args []string, stdout io.Writer) error {
+	if len(args) == 0 {
+		return errors.New("usage: cmdatlas profiles [list|set|delete] ...")
+	}
+	indexPath, err := atlas.DefaultIndexPath()
+	if err != nil {
+		return err
+	}
+	index, err := atlas.Load(indexPath)
+	if err != nil {
+		return err
+	}
+
+	switch args[0] {
+	case "list":
+		for _, name := range atlas.ProfileNames(index) {
+			commands, _ := atlas.CommandsForProfile(index, name)
+			fmt.Fprintf(stdout, "%s\t%s\n", name, strings.Join(commands, ", "))
+		}
+		return nil
+	case "set":
+		if len(args) < 3 {
+			return errors.New("usage: cmdatlas profiles set NAME COMMAND [COMMAND ...]")
+		}
+		index, err = atlas.SetProfile(index, args[1], args[2:])
+		if err != nil {
+			return err
+		}
+		if err := atlas.Save(indexPath, index); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "Saved profile %s: %s\n", strings.ToLower(strings.TrimSpace(args[1])), strings.Join(index.Profiles[strings.ToLower(strings.TrimSpace(args[1]))], ", "))
+		fmt.Fprintf(stdout, "Saved index: %s\n", indexPath)
+		return nil
+	case "delete", "rm", "remove":
+		if len(args) != 2 {
+			return errors.New("usage: cmdatlas profiles delete NAME")
+		}
+		name := strings.ToLower(strings.TrimSpace(args[1]))
+		index, err = atlas.DeleteProfile(index, name)
+		if err != nil {
+			return err
+		}
+		if err := atlas.Save(indexPath, index); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "Deleted profile %s\n", name)
+		fmt.Fprintf(stdout, "Saved index: %s\n", indexPath)
+		return nil
+	default:
+		return fmt.Errorf("unknown profiles command %q", args[0])
+	}
 }
 
 func runExport(args []string, stdout io.Writer) error {
@@ -426,6 +476,9 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  cmdatlas search [--json] QUERY")
 	fmt.Fprintln(w, "  cmdatlas show [--json] COMMAND")
 	fmt.Fprintln(w, "  cmdatlas annotate [--alias NAME] [--tag NAME] [--note TEXT] COMMAND")
+	fmt.Fprintln(w, "  cmdatlas profiles list")
+	fmt.Fprintln(w, "  cmdatlas profiles set NAME COMMAND [COMMAND ...]")
+	fmt.Fprintln(w, "  cmdatlas profiles delete NAME")
 	fmt.Fprintln(w, "  cmdatlas export --json")
 	fmt.Fprintln(w, "  cmdatlas completion [bash|zsh|fish|powershell]")
 	fmt.Fprintln(w, "  cmdatlas completion install [bash|zsh|fish|powershell]")

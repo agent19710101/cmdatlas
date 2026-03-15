@@ -123,10 +123,10 @@ func TestRunCompletionScripts(t *testing.T) {
 		args []string
 		want []string
 	}{
-		{name: "bash", args: []string{"completion", "bash"}, want: []string{"complete -F _cmdatlas_completion cmdatlas", "bash zsh fish powershell", "--alias --tag --note", "scan|search|export", "--json --profile", "default dev ops shell"}},
-		{name: "zsh", args: []string{"completion", "zsh"}, want: []string{"#compdef cmdatlas", "annotate:add aliases, tags, and notes to an indexed command", "scan:scan commands into the local atlas", "--json[emit JSON]", "--profile[scan a named command profile]", "default dev ops shell"}},
-		{name: "fish", args: []string{"completion", "fish"}, want: []string{"complete -c cmdatlas", "__cmdatlas_index_commands", "-l alias -d 'add a local alias'", "__fish_seen_subcommand_from scan search export show", "-l json -d 'emit JSON'", "-l profile -d 'scan a named command profile' -a 'default dev ops shell'"}},
-		{name: "powershell", args: []string{"completion", "powershell"}, want: []string{"Register-ArgumentCompleter", "Get-CmdAtlasIndexedCommands", "'scan'", "'--json', '--profile'", "$scanProfiles = @('default', 'dev', 'ops', 'shell')"}},
+		{name: "bash", args: []string{"completion", "bash"}, want: []string{"complete -F _cmdatlas_completion cmdatlas", "bash zsh fish powershell", "--alias --tag --note", "scan|search|export", "profiles", "--json --profile", "default dev ops shell"}},
+		{name: "zsh", args: []string{"completion", "zsh"}, want: []string{"#compdef cmdatlas", "annotate:add aliases, tags, and notes to an indexed command", "profiles:list, save, or delete custom scan profiles", "scan:scan commands into the local atlas", "--json[emit JSON]", "--profile[scan a named command profile]", "default dev ops shell"}},
+		{name: "fish", args: []string{"completion", "fish"}, want: []string{"complete -c cmdatlas", "__cmdatlas_index_commands", "-l alias -d 'add a local alias'", "__fish_seen_subcommand_from scan search export show", "-l json -d 'emit JSON'", "-l profile -d 'scan a named command profile' -a 'default dev ops shell'", "__fish_seen_subcommand_from profiles' -a 'list set delete'"}},
+		{name: "powershell", args: []string{"completion", "powershell"}, want: []string{"Register-ArgumentCompleter", "Get-CmdAtlasIndexedCommands", "'scan'", "'profiles'", "'--json', '--profile'", "$scanProfiles = @('default', 'dev', 'ops', 'shell')"}},
 	}
 
 	for _, tc := range tests {
@@ -409,6 +409,65 @@ func TestRunShowPrintsAnnotations(t *testing.T) {
 	for _, want := range []string{"Aliases: vcs", "Tags: team", "Notes:", "- daily driver"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected show output to contain %q, got %q", want, got)
+		}
+	}
+}
+
+func TestRunProfilesSetListDelete(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"profiles", "set", "team", "git", "go", "git"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("profiles set returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "Saved profile team: git, go") {
+		t.Fatalf("unexpected profiles set output: %q", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := Run([]string{"profiles", "list"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("profiles list returned error: %v", err)
+	}
+	for _, want := range []string{"default	", "dev	", "ops	", "shell	", "team	git, go"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected profiles list output to contain %q, got %q", want, stdout.String())
+		}
+	}
+
+	stdout.Reset()
+	if err := Run([]string{"profiles", "delete", "team"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("profiles delete returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "Deleted profile team") {
+		t.Fatalf("unexpected profiles delete output: %q", stdout.String())
+	}
+}
+
+func TestRunScanUsesCustomProfile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("path and shell fixture assumes unix-like environment")
+	}
+
+	configHome := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("PATH", binDir)
+
+	writeFakeCommand(t, filepath.Join(binDir, "git"), "Git fake CLI\nUsage: git [flags]\n")
+	writeFakeCommand(t, filepath.Join(binDir, "gh"), "GitHub CLI\nUsage: gh [flags]\n")
+
+	if err := Run([]string{"profiles", "set", "team", "git", "gh"}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("profiles set returned error: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"scan", "--profile", "team"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("scan with custom profile returned error: %v", err)
+	}
+	for _, want := range []string{"gh	GitHub CLI", "git	Git fake CLI", "Added: gh, git"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected scan output to contain %q, got %q", want, stdout.String())
 		}
 	}
 }
