@@ -10,7 +10,15 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            extra-test-command: go test ./... -run 'TestRunCompletionInstallWritesPowerShellScript|TestPreferredShellProfile'
+          - os: windows-latest
+            extra-test-command: go test ./... -run 'TestRunCompletionInstallWritesPowerShellScript|TestPreferredShellProfile'
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -22,7 +30,18 @@ jobs:
           cache: true
 
       - name: Verify formatting
+        if: runner.os != 'Windows'
         run: test -z "$(gofmt -l .)"
+
+      - name: Verify formatting (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $files = (gofmt -l . | Where-Object { $_ -ne '' })
+          if ($files) {
+            Write-Host $files
+            throw 'gofmt reported unformatted files'
+          }
 
       - name: Run go vet
         run: go vet ./...
@@ -30,20 +49,44 @@ jobs:
       - name: Run tests
         run: go test ./...
 
+      - name: Run high-value shell/path smoke tests
+        run: ${{ matrix.extra-test-command }}
+
       - name: Build cmdatlas
+        if: runner.os != 'Windows'
         run: go build -o ./bin/cmdatlas ./cmd/cmdatlas
 
+      - name: Build cmdatlas (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: go build -o .\bin\cmdatlas.exe .\cmd\cmdatlas
+
       - name: Smoke test built binary
+        if: runner.os != 'Windows'
         run: |
           ./bin/cmdatlas --help >/dev/null
           XDG_CONFIG_HOME="$(mktemp -d)" ./bin/cmdatlas scan --json go >/dev/null
 
+      - name: Smoke test built binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          .\bin\cmdatlas.exe --help > $null
+          $env:XDG_CONFIG_HOME = Join-Path $env:RUNNER_TEMP 'cmdatlas-config'
+          New-Item -ItemType Directory -Force -Path $env:XDG_CONFIG_HOME | Out-Null
+          .\bin\cmdatlas.exe completion install powershell > $null
+          if (-not (Test-Path (Join-Path $env:USERPROFILE 'Documents\PowerShell\Completions\cmdatlas.ps1'))) {
+            throw 'expected PowerShell completion install path to exist'
+          }
+
       - name: Self-test README release guard script
+        if: runner.os != 'Windows'
         run: python3 scripts/verify_release_readme.py --self-test
 
       - name: Validate README shape on every push/PR
+        if: runner.os != 'Windows'
         run: python3 scripts/verify_release_readme.py --version-from-readme
 
       - name: Validate README release/docs guardrails for tagged releases
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: runner.os != 'Windows' && startsWith(github.ref, 'refs/tags/v')
         run: python3 scripts/verify_release_readme.py --version "${GITHUB_REF_NAME}"

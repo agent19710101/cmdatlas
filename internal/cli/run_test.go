@@ -411,6 +411,46 @@ func TestRunCompletionInstallWritesScript(t *testing.T) {
 	}
 }
 
+func TestRunCompletionInstallWritesPowerShellScript(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"completion", "install", "powershell"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	installedPath := filepath.Join(configHome, "powershell", "Completions", "cmdatlas.ps1")
+	profilePath := filepath.Join(configHome, "powershell", "Microsoft.PowerShell_profile.ps1")
+	if runtime.GOOS == "windows" {
+		installedPath = filepath.Join(filepath.Dir(configHome), "Documents", "PowerShell", "Completions", "cmdatlas.ps1")
+		profilePath = filepath.Join(filepath.Dir(configHome), "Documents", "PowerShell", "Microsoft.PowerShell_profile.ps1")
+	}
+
+	data, err := os.ReadFile(installedPath)
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	got := string(data)
+	for _, want := range []string{"Register-ArgumentCompleter", "Get-CmdAtlasIndexedCommands", "$scanProfiles = @('default'"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected installed PowerShell completion script to contain %q, got %q", want, got)
+		}
+	}
+
+	message := stdout.String()
+	for _, want := range []string{
+		installedPath,
+		"Load now: . " + installedPath,
+		profilePath,
+		"  . " + installedPath,
+	} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("expected install output to contain %q, got %q", want, message)
+		}
+	}
+}
+
 func TestPreferredShellProfile(t *testing.T) {
 	configHome := "/tmp/cmdatlas-config"
 

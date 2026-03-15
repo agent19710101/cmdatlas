@@ -279,7 +279,7 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
-- Latest release: `v0.17.2`
+- Latest release: `v0.17.3`
 - Stable local indexing/search/show/export flow is working.
 - `cmdatlas scan` now reports added, updated, unchanged, and stale commands so humans and agents can see what changed between rescans.
 - `cmdatlas scan` now preserves saved custom profiles instead of dropping them on rescan.
@@ -294,7 +294,7 @@ This keeps the binary small and the behavior predictable, but the parser will no
 - JSON output makes `search` and `show` easier to consume from scripts and agents.
 - Completion install helpers put generated scripts into standard per-user config locations and print shell-specific activation/profile wiring hints.
 - Index writes are atomic, which reduces corruption risk if a save is interrupted.
-- GitHub Actions now validate formatting, vetting, tests, build health, built-binary smoke flows, and release-docs drift on pushes, pull requests, and version tags.
+- GitHub Actions now validate formatting, vetting, tests, build health, built-binary smoke flows, and release-docs drift on Ubuntu, plus a focused Windows job that exercises PowerShell completion installation and Windows config-path behavior.
 - Local aliases/tags/notes can capture team semantics without reprobeing commands.
 
 v0 ships these commands:
@@ -345,7 +345,7 @@ Release order for local/manual publishes:
 
 Planned release themes:
 
-- `v0.17.x` — expand parser coverage beyond the initial nested-command allowlist, improve help-layout handling, and harden release guardrails.
+- `v0.17.x` — expand parser coverage beyond the initial nested-command allowlist, improve help-layout handling, and harden release/CI guardrails.
 - `v0.18.x` — scan-history snapshots and change-aware automation hooks for agent workflows.
 - `v0.19.x` — richer warning categorization and profile-diff ergonomics for shared team workflows.
 
