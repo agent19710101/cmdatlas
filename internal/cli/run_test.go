@@ -53,6 +53,39 @@ func TestRunScanReportsDiffSummary(t *testing.T) {
 	}
 }
 
+func TestRunScanProfile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("path and shell fixture assumes unix-like environment")
+	}
+
+	configHome := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("PATH", binDir)
+
+	writeFakeCommand(t, filepath.Join(binDir, "git"), "Git fake CLI\nUsage: git [flags]\n")
+	writeFakeCommand(t, filepath.Join(binDir, "go"), "Go fake CLI\nUsage: go [flags]\n")
+	writeFakeCommand(t, filepath.Join(binDir, "docker"), "Docker fake CLI\nUsage: docker [flags]\n")
+	writeFakeCommand(t, filepath.Join(binDir, "kubectl"), "kubectl fake CLI\nUsage: kubectl [flags]\n")
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"scan", "--profile", "ops"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run(scan --profile ops) returned error: %v", err)
+	}
+
+	got := stdout.String()
+	for _, want := range []string{"docker\tDocker fake CLI", "git\tGit fake CLI", "kubectl\tkubectl fake CLI", "Added: docker, git, kubectl"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected profile scan output to contain %q, got %q", want, got)
+		}
+	}
+	for _, unwanted := range []string{"go\tGo fake CLI"} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("expected profile scan output to omit %q, got %q", unwanted, got)
+		}
+	}
+}
+
 func TestRunScanJSON(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("path and shell fixture assumes unix-like environment")
@@ -90,10 +123,10 @@ func TestRunCompletionScripts(t *testing.T) {
 		args []string
 		want []string
 	}{
-		{name: "bash", args: []string{"completion", "bash"}, want: []string{"complete -F _cmdatlas_completion cmdatlas", "bash zsh fish powershell", "--alias --tag --note", "scan|search|show|export", "--json"}},
-		{name: "zsh", args: []string{"completion", "zsh"}, want: []string{"#compdef cmdatlas", "annotate:add aliases, tags, and notes to an indexed command", "scan:scan commands into the local atlas", "--json[emit JSON]"}},
-		{name: "fish", args: []string{"completion", "fish"}, want: []string{"complete -c cmdatlas", "__cmdatlas_index_commands", "-l alias -d 'add a local alias'", "__fish_seen_subcommand_from scan search export show", "-l json -d 'emit JSON'"}},
-		{name: "powershell", args: []string{"completion", "powershell"}, want: []string{"Register-ArgumentCompleter", "Get-CmdAtlasIndexedCommands", "'scan'", "'--json'"}},
+		{name: "bash", args: []string{"completion", "bash"}, want: []string{"complete -F _cmdatlas_completion cmdatlas", "bash zsh fish powershell", "--alias --tag --note", "scan|search|export", "--json --profile", "default dev ops shell"}},
+		{name: "zsh", args: []string{"completion", "zsh"}, want: []string{"#compdef cmdatlas", "annotate:add aliases, tags, and notes to an indexed command", "scan:scan commands into the local atlas", "--json[emit JSON]", "--profile[scan a named command profile]", "default dev ops shell"}},
+		{name: "fish", args: []string{"completion", "fish"}, want: []string{"complete -c cmdatlas", "__cmdatlas_index_commands", "-l alias -d 'add a local alias'", "__fish_seen_subcommand_from scan search export show", "-l json -d 'emit JSON'", "-l profile -d 'scan a named command profile' -a 'default dev ops shell'"}},
+		{name: "powershell", args: []string{"completion", "powershell"}, want: []string{"Register-ArgumentCompleter", "Get-CmdAtlasIndexedCommands", "'scan'", "'--json', '--profile'", "$scanProfiles = @('default', 'dev', 'ops', 'shell')"}},
 	}
 
 	for _, tc := range tests {
@@ -113,6 +146,16 @@ func TestRunCompletionScripts(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRunScanRejectsProfileWithExplicitTargets(t *testing.T) {
+	err := Run([]string{"scan", "--profile", "ops", "git"}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("expected error when combining --profile with explicit targets")
+	}
+	if !strings.Contains(err.Error(), "either explicit COMMAND arguments or --profile") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -207,7 +250,7 @@ func TestRunShowUsesIndexedCommandNamesForCompletionScript(t *testing.T) {
 	}
 
 	got := stdout.String()
-	for _, want := range []string{"python3 - \"$index_path\"", "data.get('commands', [])", "scan|search|show|export", "--json", "annotate"} {
+	for _, want := range []string{"python3 - \"$index_path\"", "data.get('commands', [])", "scan|search|export", "--json", "annotate", "--profile"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected bash completion script to contain %q, got %q", want, got)
 		}

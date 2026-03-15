@@ -58,17 +58,27 @@ func Run(args []string, stdout, stderr io.Writer) error {
 func runScan(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
 	jsonOutput := fs.Bool("json", false, "emit JSON")
+	profile := fs.String("profile", "", "scan a named command profile")
 	fs.SetOutput(io.Discard)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
 	explicitTargets := len(fs.Args()) > 0
+	if explicitTargets && strings.TrimSpace(*profile) != "" {
+		return errors.New("scan accepts either explicit COMMAND arguments or --profile, not both")
+	}
+
 	targets := fs.Args()
 	if len(targets) == 0 {
-		targets = atlas.DefaultCommands()
+		selectedProfile := firstNonEmpty(strings.TrimSpace(*profile), atlas.DefaultProfileName)
+		var err error
+		targets, err = atlas.CommandsForProfile(selectedProfile)
+		if err != nil {
+			return err
+		}
 		if len(targets) == 0 {
-			return errors.New("no default commands found on PATH")
+			return fmt.Errorf("no commands from profile %q found on PATH", selectedProfile)
 		}
 	}
 	targets = dedupe(targets)
@@ -412,7 +422,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "cmdatlas - local command atlas for humans and agents")
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  cmdatlas scan [--json] [COMMAND ...]")
+	fmt.Fprintln(w, "  cmdatlas scan [--json] [--profile NAME] [COMMAND ...]")
 	fmt.Fprintln(w, "  cmdatlas search [--json] QUERY")
 	fmt.Fprintln(w, "  cmdatlas show [--json] COMMAND")
 	fmt.Fprintln(w, "  cmdatlas annotate [--alias NAME] [--tag NAME] [--note TEXT] COMMAND")
