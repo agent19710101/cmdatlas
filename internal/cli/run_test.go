@@ -2,13 +2,56 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/agent19710101/cmdatlas/internal/atlas"
 )
+
+func TestRunScanReportsDiffSummary(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("path and shell fixture assumes unix-like environment")
+	}
+
+	configHome := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("PATH", binDir)
+
+	writeFakeCommand(t, filepath.Join(binDir, "git"), "Git fake CLI\nUsage: git [flags]\n")
+	writeFakeCommand(t, filepath.Join(binDir, "go"), "Go fake CLI\nUsage: go [flags]\n")
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"scan"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("first Run(scan) returned error: %v", err)
+	}
+	first := stdout.String()
+	for _, want := range []string{"Scan summary:", "Added: git, go", "Updated: none", "Unchanged: none", "Stale: none"} {
+		if !strings.Contains(first, want) {
+			t.Fatalf("expected first scan output to contain %q, got %q", want, first)
+		}
+	}
+
+	writeFakeCommand(t, filepath.Join(binDir, "go"), "Go fake CLI updated\nUsage: go [flags]\n")
+	if err := os.Remove(filepath.Join(binDir, "git")); err != nil {
+		t.Fatalf("Remove returned error: %v", err)
+	}
+
+	stdout.Reset()
+	if err := Run([]string{"scan"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("second Run(scan) returned error: %v", err)
+	}
+	second := stdout.String()
+	for _, want := range []string{"Scan summary:", "Added: none", "Updated: go", "Unchanged: none", "Stale: git"} {
+		if !strings.Contains(second, want) {
+			t.Fatalf("expected second scan output to contain %q, got %q", want, second)
+		}
+	}
+}
 
 func TestRunCompletionScripts(t *testing.T) {
 	t.Parallel()
@@ -176,6 +219,17 @@ func TestRunShowJSON(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected JSON output to contain %q, got %q", want, got)
 		}
+	}
+}
+
+func writeFakeCommand(t *testing.T, path string, helpOutput string) {
+	t.Helper()
+	escaped := strings.ReplaceAll(helpOutput, "\\", "\\\\")
+	escaped = strings.ReplaceAll(escaped, "'", "'\\''")
+	escaped = strings.ReplaceAll(escaped, "\n", "\\n")
+	script := fmt.Sprintf("#!/bin/sh\nprintf '%%b' '%s'\n", escaped)
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
 	}
 }
 

@@ -71,6 +71,34 @@ func TestMergePreservesAnnotationsAcrossRescan(t *testing.T) {
 	}
 }
 
+func TestDocsEquivalentIgnoresAnnotationsAndScanTime(t *testing.T) {
+	a := CommandDoc{
+		Name:        "git",
+		Path:        "/usr/bin/git",
+		Summary:     "distributed version control",
+		HelpLines:   []string{"usage: git [flags]"},
+		Flags:       []FlagDoc{{Name: "--help"}},
+		Subcommands: []Subcommand{{Name: "clone", Summary: "Clone a repo"}},
+		Aliases:     []string{"vcs"},
+		Tags:        []string{"team"},
+		Notes:       []string{"daily driver"},
+		Probe:       "--help",
+	}
+	b := a
+	b.Aliases = []string{"scm"}
+	b.Tags = nil
+	b.Notes = []string{"other note"}
+
+	if !DocsEquivalent(a, b) {
+		t.Fatal("DocsEquivalent() should ignore annotations")
+	}
+
+	b.Summary = "another summary"
+	if DocsEquivalent(a, b) {
+		t.Fatal("DocsEquivalent() should detect scan-content changes")
+	}
+}
+
 func TestSetAnnotationsNormalizesValues(t *testing.T) {
 	index := Index{Commands: []CommandDoc{{Name: "git"}}}
 

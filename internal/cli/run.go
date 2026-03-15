@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/agent19710101/cmdatlas/internal/atlas"
@@ -47,6 +48,7 @@ func runScan(args []string, stdout io.Writer) error {
 		return err
 	}
 
+	explicitTargets := len(fs.Args()) > 0
 	targets := fs.Args()
 	if len(targets) == 0 {
 		targets = atlas.DefaultCommands()
@@ -54,6 +56,7 @@ func runScan(args []string, stdout io.Writer) error {
 			return errors.New("no default commands found on PATH")
 		}
 	}
+	targets = dedupe(targets)
 
 	indexPath, err := atlas.DefaultIndexPath()
 	if err != nil {
@@ -63,10 +66,15 @@ func runScan(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	previous := index
+	previousByName := map[string]atlas.CommandDoc{}
+	for _, doc := range previous.Commands {
+		previousByName[strings.ToLower(doc.Name)] = doc
+	}
 
 	var docs []atlas.CommandDoc
 	var failures []string
-	for _, target := range dedupe(targets) {
+	for _, target := range targets {
 		doc, err := probe.ScanCommand(target)
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s (%v)", target, err))
@@ -79,14 +87,47 @@ func runScan(args []string, stdout io.Writer) error {
 		return fmt.Errorf("scan failed: %s", strings.Join(failures, ", "))
 	}
 
-	index = atlas.Merge(index, docs, dedupe(targets))
+	index = atlas.Merge(index, docs, targets)
 	if err := atlas.Save(indexPath, index); err != nil {
 		return err
 	}
 
+	var added []string
+	var updated []string
+	var unchanged []string
 	for _, doc := range docs {
+		before, ok := previousByName[strings.ToLower(doc.Name)]
+		switch {
+		case !ok:
+			added = append(added, doc.Name)
+		case atlas.DocsEquivalent(before, doc):
+			unchanged = append(unchanged, doc.Name)
+		default:
+			updated = append(updated, doc.Name)
+		}
 		fmt.Fprintf(stdout, "%s\t%s\n", doc.Name, firstNonEmpty(doc.Summary, "indexed"))
 	}
+
+	var stale []string
+	if !explicitTargets {
+		currentTargets := map[string]struct{}{}
+		for _, target := range targets {
+			currentTargets[strings.ToLower(target)] = struct{}{}
+		}
+		for _, name := range previous.ScannedSet {
+			if _, ok := currentTargets[strings.ToLower(name)]; ok {
+				continue
+			}
+			stale = append(stale, name)
+		}
+	}
+
+	fmt.Fprintf(stdout, "\nScan summary:\n")
+	writeScanList(stdout, "Added", added)
+	writeScanList(stdout, "Updated", updated)
+	writeScanList(stdout, "Unchanged", unchanged)
+	writeScanList(stdout, "Stale", stale)
+
 	if len(failures) > 0 {
 		fmt.Fprintf(stdout, "\nWarnings:\n")
 		for _, failure := range failures {
@@ -298,6 +339,16 @@ func writeJSON(stdout io.Writer, value any) error {
 	data = append(data, '\n')
 	_, err = stdout.Write(data)
 	return err
+}
+
+func writeScanList(stdout io.Writer, label string, values []string) {
+	if len(values) == 0 {
+		fmt.Fprintf(stdout, "%s: none\n", label)
+		return
+	}
+	sorted := append([]string(nil), values...)
+	sort.Strings(sorted)
+	fmt.Fprintf(stdout, "%s: %s\n", label, strings.Join(sorted, ", "))
 }
 
 func dedupe(values []string) []string {

@@ -113,6 +113,12 @@ $ cmdatlas scan git go
 git     distributed version control system
 go      Go is a tool for managing Go source code.
 
+Scan summary:
+Added: git, go
+Updated: none
+Unchanged: none
+Stale: none
+
 Saved index: /home/you/.config/cmdatlas/index.json
 ```
 
@@ -190,8 +196,9 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
-- Latest release: `v0.5.0`
+- Latest release: `v0.6.0`
 - Stable local indexing/search/show/export flow is working.
+- `cmdatlas scan` now reports added, updated, unchanged, and stale commands so humans and agents can see what changed between rescans.
 - JSON output now makes `search` and `show` easier to consume from scripts and agents.
 - Completion install helpers now put generated scripts into standard per-user config locations.
 - Local aliases/tags/notes can now capture team semantics without reprobeing commands.
@@ -212,16 +219,17 @@ Covered by tests:
 - search ranking and lookup behavior
 - annotation normalization/persistence across rescans
 - index save/load round trips
+- scan diff/stale reporting across rescans
 - JSON output for `search` and `show`
 - completion script generation and unsupported-shell handling
 
 ## Roadmap
 
 - richer subcommand graphing with nested command paths
-- re-scan diffing and stale-command detection
 - smarter parser strategies for popular CLIs
 - shell-specific activation hints and profile wiring for completion install
-- next likely UX step: lightweight stale-command/rescan diff output so agents can tell what changed between scans
+- optional machine-readable scan summaries for agent pipelines
+- next likely UX step: JSON scan reports or scan-history snapshots so agents can automate follow-up on atlas changes
 
 ## License
 

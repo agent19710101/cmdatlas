@@ -2,6 +2,7 @@ package atlas
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -49,6 +50,16 @@ func Find(index Index, name string) (CommandDoc, bool) {
 		}
 	}
 	return CommandDoc{}, false
+}
+
+func DocsEquivalent(a CommandDoc, b CommandDoc) bool {
+	return a.Name == b.Name &&
+		a.Path == b.Path &&
+		a.Summary == b.Summary &&
+		reflect.DeepEqual(a.HelpLines, b.HelpLines) &&
+		reflect.DeepEqual(a.Flags, b.Flags) &&
+		reflect.DeepEqual(a.Subcommands, b.Subcommands) &&
+		a.Probe == b.Probe
 }
 
 func SetAnnotations(index Index, name string, aliases []string, tags []string, notes []string) (Index, error) {
