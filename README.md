@@ -52,13 +52,14 @@ Search the local atlas:
 
 ```bash
 cmdatlas search version control
-cmdatlas search json
+cmdatlas search --json json
 ```
 
 Inspect one indexed command:
 
 ```bash
 cmdatlas show git
+cmdatlas show --json git
 ```
 
 Export the stored index:
@@ -124,6 +125,23 @@ Flags:
   --help
 ```
 
+Example JSON output for agent/script use:
+
+```bash
+$ cmdatlas search --json version control
+[
+  {
+    "name": "git",
+    "path": "/usr/bin/git",
+    "summary": "distributed version control system",
+    "help_lines": ["usage: git [-v | --version] [-h | --help] ..."],
+    "flags": [{"name": "--version"}, {"name": "--help"}],
+    "probe": "--help",
+    "scanned_at": "2026-03-15T10:42:11Z"
+  }
+]
+```
+
 ## How v0 Works
 
 `cmdatlas` intentionally uses simple heuristics and tight safety limits:
@@ -137,11 +155,15 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
+- Latest release: `v0.3.0`
+- Stable local indexing/search/show/export flow is working.
+- JSON output now makes `search` and `show` easier to consume from scripts and agents.
+
 v0 ships these commands:
 
 - `cmdatlas scan [COMMAND ...]`
-- `cmdatlas search QUERY`
-- `cmdatlas show COMMAND`
+- `cmdatlas search [--json] QUERY`
+- `cmdatlas show [--json] COMMAND`
 - `cmdatlas export --json`
 - `cmdatlas completion [bash|zsh|fish|powershell]`
 
@@ -150,6 +172,7 @@ Covered by tests:
 - help text normalization and extraction heuristics
 - search ranking and lookup behavior
 - index save/load round trips
+- JSON output for `search` and `show`
 - completion script generation and unsupported-shell handling
 
 ## Roadmap
@@ -159,6 +182,7 @@ Covered by tests:
 - install helpers for shell completion setup
 - optional aliases, tags, and notes per command
 - smarter parser strategies for popular CLIs
+- next likely UX step: install helpers for shell completion setup so the generated scripts are one command away from use
 
 ## License
 

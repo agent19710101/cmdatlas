@@ -74,10 +74,14 @@ _cmdatlas_completion() {
             return 0
             ;;
         show)
-            __cmdatlas_complete_show
+            if [[ "$cur" == --* ]]; then
+                COMPREPLY=( $(compgen -W "--json" -- "$cur") )
+            else
+                __cmdatlas_complete_show
+            fi
             return 0
             ;;
-        export)
+        search|export)
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
             return 0
             ;;
@@ -89,7 +93,7 @@ _cmdatlas_completion() {
     fi
 
     case "${COMP_WORDS[1]}" in
-        export)
+        search|show|export)
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
             ;;
         *)
@@ -141,12 +145,10 @@ _cmdatlas() {
       return
       ;;
     show)
-      local -a atlas_commands
-      atlas_commands=(${(f)"$(_cmdatlas_index_commands)"})
-      _describe 'indexed commands' atlas_commands
+      _arguments '--json[emit JSON]' '1:indexed command:_cmdatlas_index_commands'
       return
       ;;
-    export)
+    search|export)
       _arguments '--json[emit JSON]'
       return
       ;;
@@ -158,8 +160,11 @@ _cmdatlas() {
   fi
 
   case $words[2] in
-    export)
+    search|export)
       _arguments '--json[emit JSON]'
+      ;;
+    show)
+      _arguments '--json[emit JSON]' '1:indexed command:_cmdatlas_index_commands'
       ;;
   esac
 }
@@ -196,7 +201,7 @@ end
 complete -c cmdatlas -f -n '__fish_use_subcommand' -a 'scan search show export completion help'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from show' -a '(__cmdatlas_index_commands)'
-complete -c cmdatlas -f -n '__fish_seen_subcommand_from export' -l json -d 'emit JSON'
+complete -c cmdatlas -f -n '__fish_seen_subcommand_from search export show' -l json -d 'emit JSON'
 `
 }
 
@@ -239,7 +244,18 @@ func powershellCompletionScript() string {
             }
         }
         'show' {
-            Get-CmdAtlasIndexedCommands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+            if ($wordToComplete -like '--*') {
+                @('--json') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+                    [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+                }
+            } else {
+                Get-CmdAtlasIndexedCommands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+                    [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+                }
+            }
+        }
+        'search' {
+            @('--json') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
                 [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
             }
         }

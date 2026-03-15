@@ -96,10 +96,16 @@ func runScan(args []string, stdout io.Writer) error {
 }
 
 func runSearch(args []string, stdout io.Writer) error {
-	if len(args) == 0 {
-		return errors.New("usage: cmdatlas search QUERY")
+	fs := flag.NewFlagSet("search", flag.ContinueOnError)
+	jsonOutput := fs.Bool("json", false, "emit JSON")
+	fs.SetOutput(io.Discard)
+	if err := fs.Parse(args); err != nil {
+		return err
 	}
-	query := strings.Join(args, " ")
+	if len(fs.Args()) == 0 {
+		return errors.New("usage: cmdatlas search [--json] QUERY")
+	}
+	query := strings.Join(fs.Args(), " ")
 
 	index, err := loadIndex()
 	if err != nil {
@@ -109,6 +115,9 @@ func runSearch(args []string, stdout io.Writer) error {
 	if len(results) == 0 {
 		return fmt.Errorf("no results for %q", query)
 	}
+	if *jsonOutput {
+		return writeJSON(stdout, results)
+	}
 
 	for _, doc := range results {
 		fmt.Fprintf(stdout, "%s\t%s\n", doc.Name, firstNonEmpty(doc.Summary, "(no summary)"))
@@ -117,16 +126,25 @@ func runSearch(args []string, stdout io.Writer) error {
 }
 
 func runShow(args []string, stdout io.Writer) error {
-	if len(args) != 1 {
-		return errors.New("usage: cmdatlas show COMMAND")
+	fs := flag.NewFlagSet("show", flag.ContinueOnError)
+	jsonOutput := fs.Bool("json", false, "emit JSON")
+	fs.SetOutput(io.Discard)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if len(fs.Args()) != 1 {
+		return errors.New("usage: cmdatlas show [--json] COMMAND")
 	}
 	index, err := loadIndex()
 	if err != nil {
 		return err
 	}
-	doc, ok := atlas.Find(index, args[0])
+	doc, ok := atlas.Find(index, fs.Args()[0])
 	if !ok {
-		return fmt.Errorf("command %q is not indexed", args[0])
+		return fmt.Errorf("command %q is not indexed", fs.Args()[0])
+	}
+	if *jsonOutput {
+		return writeJSON(stdout, doc)
 	}
 
 	fmt.Fprintf(stdout, "Name: %s\n", doc.Name)
@@ -188,6 +206,16 @@ func loadIndex() (atlas.Index, error) {
 	return atlas.Load(indexPath)
 }
 
+func writeJSON(stdout io.Writer, value any) error {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	_, err = stdout.Write(data)
+	return err
+}
+
 func dedupe(values []string) []string {
 	seen := map[string]struct{}{}
 	out := make([]string, 0, len(values))
@@ -217,8 +245,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  cmdatlas scan [COMMAND ...]")
-	fmt.Fprintln(w, "  cmdatlas search QUERY")
-	fmt.Fprintln(w, "  cmdatlas show COMMAND")
+	fmt.Fprintln(w, "  cmdatlas search [--json] QUERY")
+	fmt.Fprintln(w, "  cmdatlas show [--json] COMMAND")
 	fmt.Fprintln(w, "  cmdatlas export --json")
 	fmt.Fprintln(w, "  cmdatlas completion [bash|zsh|fish|powershell]")
 }

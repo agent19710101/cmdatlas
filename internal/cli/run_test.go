@@ -77,7 +77,7 @@ func TestRunShowUsesIndexedCommandNamesForCompletionScript(t *testing.T) {
 	}
 
 	got := stdout.String()
-	for _, want := range []string{"python3 - \"$index_path\"", "data.get('commands', [])"} {
+	for _, want := range []string{"python3 - \"$index_path\"", "data.get('commands', [])", "search|show|export", "--json"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected bash completion script to contain %q, got %q", want, got)
 		}
@@ -89,5 +89,64 @@ func TestRunShowUsesIndexedCommandNamesForCompletionScript(t *testing.T) {
 	}
 	if len(files) != 1 || files[0].Name() != "index.json" {
 		t.Fatalf("expected index.json to exist, got %v", files)
+	}
+}
+
+func TestRunSearchJSON(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	indexPath := filepath.Join(configHome, "cmdatlas", "index.json")
+	index := atlas.Index{
+		Version: atlas.CurrentIndexVersion,
+		Commands: []atlas.CommandDoc{
+			{Name: "git", Summary: "distributed version control system"},
+			{Name: "go", Summary: "Go toolchain"},
+		},
+	}
+	if err := atlas.Save(indexPath, index); err != nil {
+		t.Fatalf("Save returned error: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"search", "--json", "version", "control"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	got := stdout.String()
+	for _, want := range []string{"\n  {", "\"name\": \"git\"", "\"summary\": \"distributed version control system\""} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected JSON output to contain %q, got %q", want, got)
+		}
+	}
+}
+
+func TestRunShowJSON(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	indexPath := filepath.Join(configHome, "cmdatlas", "index.json")
+	index := atlas.Index{
+		Version: atlas.CurrentIndexVersion,
+		Commands: []atlas.CommandDoc{{
+			Name:      "git",
+			Path:      "/usr/bin/git",
+			Summary:   "distributed version control system",
+			Probe:     "--help",
+			HelpLines: []string{"usage: git [--help]"},
+		}},
+	}
+	if err := atlas.Save(indexPath, index); err != nil {
+		t.Fatalf("Save returned error: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"show", "--json", "git"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	got := stdout.String()
+	for _, want := range []string{"\"name\": \"git\"", "\"path\": \"/usr/bin/git\"", "\"probe\": \"--help\""} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected JSON output to contain %q, got %q", want, got)
+		}
 	}
 }
