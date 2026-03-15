@@ -113,6 +113,23 @@ func ProfileNames(index Index) []string {
 	return names
 }
 
+func RawCommandsForProfile(index Index, name string) ([]string, error) {
+	key := normalizeProfileName(name)
+	if key == "" {
+		key = DefaultProfileName
+	}
+	candidates, ok := profileCommands(index, key)
+	if !ok {
+		return nil, fmt.Errorf("unknown scan profile %q", name)
+	}
+	return dedupeProfileCommands(candidates), nil
+}
+
+func IsBuiltInProfile(name string) bool {
+	_, ok := builtInScanProfiles[normalizeProfileName(name)]
+	return ok
+}
+
 func SetProfile(index Index, name string, commands []string) (Index, error) {
 	name = normalizeProfileName(name)
 	if name == "" {

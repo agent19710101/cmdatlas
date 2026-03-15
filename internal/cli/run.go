@@ -366,8 +366,12 @@ func runProfiles(args []string, stdout io.Writer) error {
 	switch args[0] {
 	case "list":
 		for _, name := range atlas.ProfileNames(index) {
-			commands, _ := atlas.CommandsForProfile(index, name)
-			fmt.Fprintf(stdout, "%s\t%s\n", name, strings.Join(commands, ", "))
+			commands, _ := atlas.RawCommandsForProfile(index, name)
+			source := "custom"
+			if atlas.IsBuiltInProfile(name) {
+				source = "built-in"
+			}
+			fmt.Fprintf(stdout, "%s\t%s\t%s\n", name, source, strings.Join(commands, ", "))
 		}
 		return nil
 	case "set":

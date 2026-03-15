@@ -221,6 +221,31 @@ func TestRunProfilesAddAndRemove(t *testing.T) {
 	}
 }
 
+func TestRunProfilesListShowsBuiltInAndCustomCommands(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	if err := Run([]string{"profiles", "set", "team", "git", "go"}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run(profiles set) returned error: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"profiles", "list"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run(profiles list) returned error: %v", err)
+	}
+
+	got := stdout.String()
+	for _, want := range []string{
+		"default\tbuilt-in\taws, cargo, curl, docker, fd, gh, git, go, helm, kubectl, make, node, npm, pip, python3, rg, rustc, terraform",
+		"ops\tbuilt-in\taws, curl, docker, gh, git, helm, kubectl, terraform",
+		"team\tcustom\tgit, go",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected profiles list output to contain %q, got %q", want, got)
+		}
+	}
+}
+
 func TestRunProfilesExportImport(t *testing.T) {
 	configHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", configHome)
@@ -574,7 +599,7 @@ func TestRunProfilesSetListDelete(t *testing.T) {
 	if err := Run([]string{"profiles", "list"}, &stdout, &bytes.Buffer{}); err != nil {
 		t.Fatalf("profiles list returned error: %v", err)
 	}
-	for _, want := range []string{"default	", "dev	", "ops	", "shell	", "team	git, go"} {
+	for _, want := range []string{"default\tbuilt-in\t", "dev\tbuilt-in\t", "ops\tbuilt-in\t", "shell\tbuilt-in\t", "team\tcustom\tgit, go"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("expected profiles list output to contain %q, got %q", want, stdout.String())
 		}
