@@ -500,4 +500,13 @@ func TestRunScanUsesCustomProfile(t *testing.T) {
 			t.Fatalf("expected scan output to contain %q, got %q", want, stdout.String())
 		}
 	}
+
+	indexPath := filepath.Join(configHome, "cmdatlas", "index.json")
+	index, err := atlas.Load(indexPath)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if got := strings.Join(index.Profiles["team"], ","); got != "gh,git" {
+		t.Fatalf("team profile after scan = %q, want %q", got, "gh,git")
+	}
 }

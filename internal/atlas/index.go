@@ -35,11 +35,20 @@ func Merge(existing Index, docs []CommandDoc, scannedSet []string) Index {
 
 	sort.Strings(scannedSet)
 
+	var profiles map[string][]string
+	if len(existing.Profiles) > 0 {
+		profiles = make(map[string][]string, len(existing.Profiles))
+		for name, commands := range existing.Profiles {
+			profiles[name] = append([]string(nil), commands...)
+		}
+	}
+
 	return Index{
 		Version:    CurrentIndexVersion,
 		Generated:  time.Now().UTC(),
 		Commands:   commands,
 		ScannedSet: scannedSet,
+		Profiles:   profiles,
 	}
 }
 

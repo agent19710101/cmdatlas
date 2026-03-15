@@ -248,17 +248,18 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
-- Latest release: `v0.10.0`
+- Latest release: `v0.12.0`
 - Stable local indexing/search/show/export flow is working.
 - `cmdatlas scan` now reports added, updated, unchanged, and stale commands so humans and agents can see what changed between rescans.
-- `cmdatlas profiles set NAME ...`, `profiles list`, and `profiles delete NAME` now let users save reusable local scan profiles on top of the built-in `default`, `dev`, `ops`, and `shell` sets.
-- `cmdatlas scan --profile NAME` now works with both built-in profiles and custom local profiles for repeatable machine- or team-specific scans.
-- `cmdatlas scan --json` now exposes scanned docs plus diff buckets for scripts and agents.
-- JSON output now makes `search` and `show` easier to consume from scripts and agents.
-- Completion install helpers now put generated scripts into standard per-user config locations and print shell-specific activation/profile wiring hints.
-- Index writes are now atomic, which reduces corruption risk if a save is interrupted.
-- GitHub Actions now validates formatting, tests, and build health on pushes, pull requests, and version tags.
-- Local aliases/tags/notes can now capture team semantics without reprobeing commands.
+- `cmdatlas scan` now preserves saved custom profiles instead of dropping them on rescan.
+- `cmdatlas profiles set NAME ...`, `profiles add NAME ...`, `profiles remove NAME ...`, `profiles list`, and `profiles delete NAME` support persistent reusable local scan profiles on top of the built-in `default`, `dev`, `ops`, and `shell` sets.
+- `cmdatlas scan --profile NAME` works with both built-in profiles and custom local profiles for repeatable machine- or team-specific scans.
+- `cmdatlas scan --json` exposes scanned docs plus diff buckets for scripts and agents.
+- JSON output makes `search` and `show` easier to consume from scripts and agents.
+- Completion install helpers put generated scripts into standard per-user config locations and print shell-specific activation/profile wiring hints.
+- Index writes are atomic, which reduces corruption risk if a save is interrupted.
+- GitHub Actions now validate formatting, vetting, tests, build health, built-binary smoke flows, and release-docs drift on pushes, pull requests, and version tags.
+- Local aliases/tags/notes can capture team semantics without reprobeing commands.
 
 v0 ships these commands:
 
@@ -268,6 +269,8 @@ v0 ships these commands:
 - `cmdatlas annotate [--alias NAME] [--tag NAME] [--note TEXT] COMMAND`
 - `cmdatlas profiles list`
 - `cmdatlas profiles set NAME COMMAND [COMMAND ...]`
+- `cmdatlas profiles add NAME COMMAND [COMMAND ...]`
+- `cmdatlas profiles remove NAME COMMAND [COMMAND ...]`
 - `cmdatlas profiles delete NAME`
 - `cmdatlas export --json`
 - `cmdatlas completion [bash|zsh|fish|powershell]`
@@ -283,7 +286,7 @@ Covered by tests:
 - scan diff/stale reporting across rescans
 - JSON output for `scan`, `search`, and `show`
 - built-in and custom scan-profile selection plus completion suggestions for profile names
-- custom profile create/list/delete flows and persistence in the local atlas store
+- custom profile create/add/remove/list/delete flows and persistence in the local atlas store
 - completion script generation and unsupported-shell handling
 
 ## Roadmap
@@ -294,14 +297,5 @@ Covered by tests:
 - next likely UX step: richer machine-readable scan warnings plus more advanced profile import/share flows
 
 ## License
-
-MIT. See [LICENSE](LICENSE).
-MIT. See [LICENSE](LICENSE).
-readable scan warnings
-
-## License
-
-MIT. See [LICENSE](LICENSE).
-se
 
 MIT. See [LICENSE](LICENSE).
