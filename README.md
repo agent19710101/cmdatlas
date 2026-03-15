@@ -49,6 +49,13 @@ Scan the default curated shortlist that exists on your `PATH`:
 cmdatlas scan
 ```
 
+Scan with machine-readable output for scripts or agents:
+
+```bash
+cmdatlas scan --json
+cmdatlas scan --json git go
+```
+
 Search the local atlas:
 
 ```bash
@@ -104,6 +111,8 @@ $XDG_CONFIG_HOME/cmdatlas/index.json
 
 If `XDG_CONFIG_HOME` is not set, Go falls back to the platform user config directory.
 
+Index saves are atomic: `cmdatlas` writes a temp file in the same directory and only replaces `index.json` after the new contents are fully written.
+
 ## Examples
 
 Example scan:
@@ -120,6 +129,31 @@ Unchanged: none
 Stale: none
 
 Saved index: /home/you/.config/cmdatlas/index.json
+```
+
+Example machine-readable scan output:
+
+```bash
+$ cmdatlas scan --json git go
+{
+  "index_path": "/home/you/.config/cmdatlas/index.json",
+  "summary": {
+    "added": ["git", "go"],
+    "updated": [],
+    "unchanged": [],
+    "stale": []
+  },
+  "commands": [
+    {
+      "name": "git",
+      "summary": "distributed version control system"
+    },
+    {
+      "name": "go",
+      "summary": "Go is a tool for managing Go source code."
+    }
+  ]
+}
 ```
 
 Example search:
@@ -196,16 +230,19 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
-- Latest release: `v0.6.0`
+- Latest release: `v0.7.0`
 - Stable local indexing/search/show/export flow is working.
 - `cmdatlas scan` now reports added, updated, unchanged, and stale commands so humans and agents can see what changed between rescans.
+- `cmdatlas scan --json` now exposes scanned docs plus diff buckets for scripts and agents.
 - JSON output now makes `search` and `show` easier to consume from scripts and agents.
 - Completion install helpers now put generated scripts into standard per-user config locations.
+- Index writes are now atomic, which reduces corruption risk if a save is interrupted.
+- GitHub Actions now validates formatting, tests, and build health on pushes, pull requests, and version tags.
 - Local aliases/tags/notes can now capture team semantics without reprobeing commands.
 
 v0 ships these commands:
 
-- `cmdatlas scan [COMMAND ...]`
+- `cmdatlas scan [--json] [COMMAND ...]`
 - `cmdatlas search [--json] QUERY`
 - `cmdatlas show [--json] COMMAND`
 - `cmdatlas annotate [--alias NAME] [--tag NAME] [--note TEXT] COMMAND`
@@ -219,8 +256,9 @@ Covered by tests:
 - search ranking and lookup behavior
 - annotation normalization/persistence across rescans
 - index save/load round trips
+- atomic save failure preservation for the index store
 - scan diff/stale reporting across rescans
-- JSON output for `search` and `show`
+- JSON output for `scan`, `search`, and `show`
 - completion script generation and unsupported-shell handling
 
 ## Roadmap
@@ -228,8 +266,8 @@ Covered by tests:
 - richer subcommand graphing with nested command paths
 - smarter parser strategies for popular CLIs
 - shell-specific activation hints and profile wiring for completion install
-- optional machine-readable scan summaries for agent pipelines
-- next likely UX step: JSON scan reports or scan-history snapshots so agents can automate follow-up on atlas changes
+- scan-history snapshots so agents can automate follow-up on atlas changes
+- next likely UX step: command filtering, scan profiles, or richer machine-readable scan warnings
 
 ## License
 

@@ -97,7 +97,7 @@ _cmdatlas_completion() {
             fi
             return 0
             ;;
-        search|export)
+        scan|search|export)
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
             return 0
             ;;
@@ -109,7 +109,7 @@ _cmdatlas_completion() {
     fi
 
     case "${COMP_WORDS[1]}" in
-        search|show|export)
+        scan|search|show|export)
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
             ;;
         annotate)
@@ -168,7 +168,7 @@ _cmdatlas() {
       _values 'shell' bash zsh fish powershell
       return
       ;;
-    show)
+    scan|show)
       _arguments '--json[emit JSON]' '1:indexed command:_cmdatlas_index_commands'
       return
       ;;
@@ -192,7 +192,7 @@ _cmdatlas() {
   fi
 
   case $words[2] in
-    search|export)
+    scan|search|export)
       _arguments '--json[emit JSON]'
       ;;
     show)
@@ -240,7 +240,7 @@ end
 complete -c cmdatlas -f -n '__fish_use_subcommand' -a 'scan search show annotate export completion help'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from show annotate' -a '(__cmdatlas_index_commands)'
-complete -c cmdatlas -f -n '__fish_seen_subcommand_from search export show' -l json -d 'emit JSON'
+complete -c cmdatlas -f -n '__fish_seen_subcommand_from scan search export show' -l json -d 'emit JSON'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from annotate' -l alias -d 'add a local alias'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from annotate' -l tag -d 'add a local tag'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from annotate' -l note -d 'add a local note'
@@ -305,6 +305,11 @@ func powershellCompletionScript() string {
                 Get-CmdAtlasIndexedCommands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
                     [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
                 }
+            }
+        }
+        'scan' {
+            @('--json') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+                [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
             }
         }
         'search' {

@@ -13,6 +13,20 @@ import (
 	"github.com/agent19710101/cmdatlas/internal/probe"
 )
 
+type scanJSONOutput struct {
+	IndexPath string             `json:"index_path"`
+	Summary   scanSummary        `json:"summary"`
+	Commands  []atlas.CommandDoc `json:"commands"`
+	Warnings  []string           `json:"warnings,omitempty"`
+}
+
+type scanSummary struct {
+	Added     []string `json:"added"`
+	Updated   []string `json:"updated"`
+	Unchanged []string `json:"unchanged"`
+	Stale     []string `json:"stale"`
+}
+
 func Run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		printUsage(stdout)
@@ -43,6 +57,7 @@ func Run(args []string, stdout, stderr io.Writer) error {
 
 func runScan(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
+	jsonOutput := fs.Bool("json", false, "emit JSON")
 	fs.SetOutput(io.Discard)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -105,7 +120,6 @@ func runScan(args []string, stdout io.Writer) error {
 		default:
 			updated = append(updated, doc.Name)
 		}
-		fmt.Fprintf(stdout, "%s\t%s\n", doc.Name, firstNonEmpty(doc.Summary, "indexed"))
 	}
 
 	var stale []string
@@ -120,6 +134,15 @@ func runScan(args []string, stdout io.Writer) error {
 			}
 			stale = append(stale, name)
 		}
+	}
+
+	summary := scanSummary{Added: added, Updated: updated, Unchanged: unchanged, Stale: stale}
+	if *jsonOutput {
+		return writeJSON(stdout, scanJSONOutput{IndexPath: indexPath, Summary: summary, Commands: docs, Warnings: failures})
+	}
+
+	for _, doc := range docs {
+		fmt.Fprintf(stdout, "%s\t%s\n", doc.Name, firstNonEmpty(doc.Summary, "indexed"))
 	}
 
 	fmt.Fprintf(stdout, "\nScan summary:\n")
@@ -389,7 +412,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "cmdatlas - local command atlas for humans and agents")
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  cmdatlas scan [COMMAND ...]")
+	fmt.Fprintln(w, "  cmdatlas scan [--json] [COMMAND ...]")
 	fmt.Fprintln(w, "  cmdatlas search [--json] QUERY")
 	fmt.Fprintln(w, "  cmdatlas show [--json] COMMAND")
 	fmt.Fprintln(w, "  cmdatlas annotate [--alias NAME] [--tag NAME] [--note TEXT] COMMAND")
