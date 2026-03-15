@@ -115,6 +115,38 @@ func TestRunScanJSON(t *testing.T) {
 	}
 }
 
+func TestRunScanJSONIncludesStructuredWarnings(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("path and shell fixture assumes unix-like environment")
+	}
+
+	configHome := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("PATH", binDir)
+
+	writeFakeCommand(t, filepath.Join(binDir, "git"), "Git fake CLI\nUsage: git [flags]\n")
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"scan", "--json", "git", "missing-tool"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run(scan --json git missing-tool) returned error: %v", err)
+	}
+
+	got := stdout.String()
+	for _, want := range []string{
+		"\"warnings\": [",
+		"missing-tool [not_found]",
+		"\"warning_details\": [",
+		"\"command\": \"missing-tool\"",
+		"\"kind\": \"not_found\"",
+		"\"message\":",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected JSON warning output to contain %q, got %q", want, got)
+		}
+	}
+}
+
 func TestRunCompletionScripts(t *testing.T) {
 	t.Parallel()
 

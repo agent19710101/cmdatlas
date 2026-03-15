@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os/exec"
 	"sort"
 	"strings"
 
@@ -14,10 +15,17 @@ import (
 )
 
 type scanJSONOutput struct {
-	IndexPath string             `json:"index_path"`
-	Summary   scanSummary        `json:"summary"`
-	Commands  []atlas.CommandDoc `json:"commands"`
-	Warnings  []string           `json:"warnings,omitempty"`
+	IndexPath      string             `json:"index_path"`
+	Summary        scanSummary        `json:"summary"`
+	Commands       []atlas.CommandDoc `json:"commands"`
+	Warnings       []string           `json:"warnings,omitempty"`
+	WarningDetails []scanWarning      `json:"warning_details,omitempty"`
+}
+
+type scanWarning struct {
+	Command string `json:"command"`
+	Kind    string `json:"kind"`
+	Message string `json:"message"`
 }
 
 type scanSummary struct {
@@ -101,10 +109,13 @@ func runScan(args []string, stdout io.Writer) error {
 
 	var docs []atlas.CommandDoc
 	var failures []string
+	var warningDetails []scanWarning
 	for _, target := range targets {
 		doc, err := probe.ScanCommand(target)
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s (%v)", target, err))
+			warning := newScanWarning(target, err)
+			failures = append(failures, warning.String())
+			warningDetails = append(warningDetails, warning)
 			continue
 		}
 		docs = append(docs, doc)
@@ -150,7 +161,13 @@ func runScan(args []string, stdout io.Writer) error {
 
 	summary := scanSummary{Added: added, Updated: updated, Unchanged: unchanged, Stale: stale}
 	if *jsonOutput {
-		return writeJSON(stdout, scanJSONOutput{IndexPath: indexPath, Summary: summary, Commands: docs, Warnings: failures})
+		return writeJSON(stdout, scanJSONOutput{
+			IndexPath:      indexPath,
+			Summary:        summary,
+			Commands:       docs,
+			Warnings:       failures,
+			WarningDetails: warningDetails,
+		})
 	}
 
 	for _, doc := range docs {
@@ -447,6 +464,18 @@ func loadIndex() (atlas.Index, error) {
 		return atlas.Index{}, err
 	}
 	return atlas.Load(indexPath)
+}
+
+func newScanWarning(command string, err error) scanWarning {
+	warning := scanWarning{Command: command, Kind: "probe_failed", Message: err.Error()}
+	if errors.Is(err, exec.ErrNotFound) {
+		warning.Kind = "not_found"
+	}
+	return warning
+}
+
+func (w scanWarning) String() string {
+	return fmt.Sprintf("%s [%s]: %s", w.Command, w.Kind, w.Message)
 }
 
 func writeJSON(stdout io.Writer, value any) error {

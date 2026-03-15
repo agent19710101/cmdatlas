@@ -152,7 +152,7 @@ Saved index: /home/you/.config/cmdatlas/index.json
 Example machine-readable scan output:
 
 ```bash
-$ cmdatlas scan --json git go
+$ cmdatlas scan --json git go missing-tool
 {
   "index_path": "/home/you/.config/cmdatlas/index.json",
   "summary": {
@@ -169,6 +169,16 @@ $ cmdatlas scan --json git go
     {
       "name": "go",
       "summary": "Go is a tool for managing Go source code."
+    }
+  ],
+  "warnings": [
+    "missing-tool [not_found]: executable file not found in $PATH"
+  ],
+  "warning_details": [
+    {
+      "command": "missing-tool",
+      "kind": "not_found",
+      "message": "executable file not found in $PATH"
     }
   ]
 }
@@ -248,13 +258,14 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
-- Latest release: `v0.12.0`
+- Latest release: `v0.13.0`
 - Stable local indexing/search/show/export flow is working.
 - `cmdatlas scan` now reports added, updated, unchanged, and stale commands so humans and agents can see what changed between rescans.
 - `cmdatlas scan` now preserves saved custom profiles instead of dropping them on rescan.
 - `cmdatlas profiles set NAME ...`, `profiles add NAME ...`, `profiles remove NAME ...`, `profiles list`, and `profiles delete NAME` support persistent reusable local scan profiles on top of the built-in `default`, `dev`, `ops`, and `shell` sets.
 - `cmdatlas scan --profile NAME` works with both built-in profiles and custom local profiles for repeatable machine- or team-specific scans.
 - `cmdatlas scan --json` exposes scanned docs plus diff buckets for scripts and agents.
+- Machine-readable `warning_details` now classify skipped scan targets like missing binaries versus probe failures, so scripts and agents can react without string parsing.
 - JSON output makes `search` and `show` easier to consume from scripts and agents.
 - Completion install helpers put generated scripts into standard per-user config locations and print shell-specific activation/profile wiring hints.
 - Index writes are atomic, which reduces corruption risk if a save is interrupted.
@@ -284,7 +295,7 @@ Covered by tests:
 - index save/load round trips
 - atomic save failure preservation for the index store
 - scan diff/stale reporting across rescans
-- JSON output for `scan`, `search`, and `show`
+- JSON output for `scan`, `search`, and `show`, including structured scan warning details
 - built-in and custom scan-profile selection plus completion suggestions for profile names
 - custom profile create/add/remove/list/delete flows and persistence in the local atlas store
 - completion script generation and unsupported-shell handling
@@ -294,7 +305,7 @@ Covered by tests:
 - richer subcommand graphing with nested command paths
 - smarter parser strategies for popular CLIs
 - scan-history snapshots so agents can automate follow-up on atlas changes
-- next likely UX step: richer machine-readable scan warnings plus more advanced profile import/share flows
+- next likely UX step: profile import/share flows and warning handling for more probe-failure categories
 
 ## License
 
