@@ -164,7 +164,7 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
-- Latest release: `v0.3.0`
+- Latest release: `v0.4.0`
 - Stable local indexing/search/show/export flow is working.
 - JSON output now makes `search` and `show` easier to consume from scripts and agents.
 - Completion install helpers now put generated scripts into standard per-user config locations.
