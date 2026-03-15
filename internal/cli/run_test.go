@@ -726,3 +726,57 @@ func TestRunScanUsesCustomProfile(t *testing.T) {
 		t.Fatalf("team profile after scan = %q, want %q", got, "gh,git")
 	}
 }
+
+func TestRunScanHistoryJSON(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("path and shell fixture assumes unix-like environment")
+	}
+
+	configHome := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("PATH", binDir)
+
+	writeFakeCommand(t, filepath.Join(binDir, "git"), "Git fake CLI\nUsage: git [flags]\n")
+	writeFakeCommand(t, filepath.Join(binDir, "docker"), "Docker fake CLI\nUsage: docker [flags]\n")
+
+	if err := Run([]string{"scan", "--profile", "ops"}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("scan --profile ops returned error: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"history", "--json", "--profile", "ops", "--limit", "1"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("history --json returned error: %v", err)
+	}
+
+	got := stdout.String()
+	for _, want := range []string{"\"entries\": [", "\"profile\": \"ops\"", "\"targets\": [", "\"summary\": {", "\"commands\": ["} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected history JSON output to contain %q, got %q", want, got)
+		}
+	}
+}
+
+func TestRunHistoryHumanOutput(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	indexPath := filepath.Join(configHome, "cmdatlas", "index.json")
+	index := atlas.AppendScanHistory(atlas.Index{Version: atlas.CurrentIndexVersion}, atlas.ScanSnapshot{
+		Profile: "ops",
+		Targets: []string{"docker", "git"},
+		Summary: atlas.ScanSummary{Added: []string{"git"}, Updated: []string{"docker"}},
+	})
+	if err := atlas.Save(indexPath, index); err != nil {
+		t.Fatalf("Save returned error: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"history", "--limit", "1"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("history returned error: %v", err)
+	}
+	for _, want := range []string{"profile=ops", "targets=docker, git", "added=git", "updated=docker"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected history output to contain %q, got %q", want, stdout.String())
+		}
+	}
+}

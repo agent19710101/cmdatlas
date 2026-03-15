@@ -11,6 +11,7 @@ type Index struct {
 	ScannedSet  []string                   `json:"scanned_set,omitempty"`
 	Profiles    map[string][]string        `json:"profiles,omitempty"`
 	ProfileMeta map[string]ProfileMetadata `json:"profile_meta,omitempty"`
+	History     []ScanSnapshot             `json:"history,omitempty"`
 }
 
 type ProfileMetadata struct {

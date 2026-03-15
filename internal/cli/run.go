@@ -17,24 +17,17 @@ import (
 )
 
 type scanJSONOutput struct {
-	IndexPath      string             `json:"index_path"`
-	Summary        scanSummary        `json:"summary"`
-	Commands       []atlas.CommandDoc `json:"commands"`
-	Warnings       []string           `json:"warnings,omitempty"`
-	WarningDetails []scanWarning      `json:"warning_details,omitempty"`
+	IndexPath      string              `json:"index_path"`
+	Summary        atlas.ScanSummary   `json:"summary"`
+	Commands       []atlas.CommandDoc  `json:"commands"`
+	Warnings       []string            `json:"warnings,omitempty"`
+	WarningDetails []atlas.ScanWarning `json:"warning_details,omitempty"`
+	HistoryEntry   *atlas.ScanSnapshot `json:"history_entry,omitempty"`
 }
 
-type scanWarning struct {
-	Command string `json:"command"`
-	Kind    string `json:"kind"`
-	Message string `json:"message"`
-}
-
-type scanSummary struct {
-	Added     []string `json:"added"`
-	Updated   []string `json:"updated"`
-	Unchanged []string `json:"unchanged"`
-	Stale     []string `json:"stale"`
+type historyJSONOutput struct {
+	IndexPath string               `json:"index_path"`
+	Entries   []atlas.ScanSnapshot `json:"entries"`
 }
 
 type profilesJSONExport struct {
@@ -67,6 +60,8 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		return runAnnotate(args[1:], stdout)
 	case "profiles":
 		return runProfiles(args[1:], stdout)
+	case "history":
+		return runHistory(args[1:], stdout)
 	case "export":
 		return runExport(args[1:], stdout)
 	case "completion":
@@ -103,9 +98,10 @@ func runScan(args []string, stdout io.Writer) error {
 		return err
 	}
 
+	selectedProfile := ""
 	targets := fs.Args()
 	if len(targets) == 0 {
-		selectedProfile := firstNonEmpty(strings.TrimSpace(*profile), atlas.DefaultProfileName)
+		selectedProfile = firstNonEmpty(strings.TrimSpace(*profile), atlas.DefaultProfileName)
 		targets, err = atlas.CommandsForProfile(index, selectedProfile)
 		if err != nil {
 			return err
@@ -124,12 +120,12 @@ func runScan(args []string, stdout io.Writer) error {
 
 	var docs []atlas.CommandDoc
 	var failures []string
-	var warningDetails []scanWarning
+	var warningDetails []atlas.ScanWarning
 	for _, target := range targets {
 		doc, err := probe.ScanCommand(target)
 		if err != nil {
 			warning := newScanWarning(target, err)
-			failures = append(failures, warning.String())
+			failures = append(failures, formatScanWarning(warning))
 			warningDetails = append(warningDetails, warning)
 			continue
 		}
@@ -141,9 +137,6 @@ func runScan(args []string, stdout io.Writer) error {
 	}
 
 	index = atlas.Merge(index, docs, targets)
-	if err := atlas.Save(indexPath, index); err != nil {
-		return err
-	}
 
 	var added []string
 	var updated []string
@@ -174,7 +167,23 @@ func runScan(args []string, stdout io.Writer) error {
 		}
 	}
 
-	summary := scanSummary{Added: added, Updated: updated, Unchanged: unchanged, Stale: stale}
+	summary := atlas.ScanSummary{Added: added, Updated: updated, Unchanged: unchanged, Stale: stale}
+	historyEntry := atlas.ScanSnapshot{
+		ScannedAt:      index.Generated,
+		Profile:        selectedProfile,
+		Targets:        targets,
+		Summary:        summary,
+		Warnings:       failures,
+		WarningDetails: warningDetails,
+		Commands:       commandStates(docs),
+	}
+	index = atlas.AppendScanHistory(index, historyEntry)
+	if err := atlas.Save(indexPath, index); err != nil {
+		return err
+	}
+	if len(index.History) > 0 {
+		historyEntry = index.History[0]
+	}
 	if *jsonOutput {
 		return writeJSON(stdout, scanJSONOutput{
 			IndexPath:      indexPath,
@@ -182,6 +191,7 @@ func runScan(args []string, stdout io.Writer) error {
 			Commands:       docs,
 			Warnings:       failures,
 			WarningDetails: warningDetails,
+			HistoryEntry:   &historyEntry,
 		})
 	}
 
@@ -205,7 +215,65 @@ func runScan(args []string, stdout io.Writer) error {
 	return nil
 }
 
-func runSearch(args []string, stdout io.Writer) error { /* unchanged body */
+func runHistory(args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("history", flag.ContinueOnError)
+	jsonOutput := fs.Bool("json", false, "emit JSON")
+	limit := fs.Int("limit", 10, "maximum number of history entries to show")
+	profile := fs.String("profile", "", "filter to a named scan profile")
+	fs.SetOutput(io.Discard)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if len(fs.Args()) != 0 {
+		return errors.New("usage: cmdatlas history [--json] [--limit N] [--profile NAME]")
+	}
+	if *limit <= 0 {
+		return errors.New("history --limit must be >= 1")
+	}
+
+	indexPath, err := atlas.DefaultIndexPath()
+	if err != nil {
+		return err
+	}
+	index, err := atlas.Load(indexPath)
+	if err != nil {
+		return err
+	}
+
+	entries := filterHistory(index.History, strings.TrimSpace(*profile), *limit)
+	if *jsonOutput {
+		return writeJSON(stdout, historyJSONOutput{IndexPath: indexPath, Entries: entries})
+	}
+	if len(entries) == 0 {
+		if strings.TrimSpace(*profile) != "" {
+			_, err := fmt.Fprintf(stdout, "No scan history for profile %s yet.\n", *profile)
+			return err
+		}
+		_, err := io.WriteString(stdout, "No scan history yet.\n")
+		return err
+	}
+
+	for _, entry := range entries {
+		label := "manual"
+		if entry.Profile != "" {
+			label = entry.Profile
+		}
+		if _, err := fmt.Fprintf(stdout, "%s	profile=%s	targets=%s	added=%s	updated=%s	unchanged=%s	stale=%s\n",
+			entry.ScannedAt.Format(time.RFC3339),
+			label,
+			noneIfEmpty(entry.Targets),
+			noneIfEmpty(entry.Summary.Added),
+			noneIfEmpty(entry.Summary.Updated),
+			noneIfEmpty(entry.Summary.Unchanged),
+			noneIfEmpty(entry.Summary.Stale),
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runSearch(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("search", flag.ContinueOnError)
 	jsonOutput := fs.Bool("json", false, "emit JSON")
 	fs.SetOutput(io.Discard)
@@ -664,15 +732,43 @@ func loadIndex() (atlas.Index, error) {
 	return atlas.Load(indexPath)
 }
 
-func newScanWarning(command string, err error) scanWarning {
-	warning := scanWarning{Command: command, Kind: "probe_failed", Message: err.Error()}
+func filterHistory(history []atlas.ScanSnapshot, profile string, limit int) []atlas.ScanSnapshot {
+	profile = strings.TrimSpace(profile)
+	entries := make([]atlas.ScanSnapshot, 0, len(history))
+	for _, entry := range history {
+		if profile != "" && !strings.EqualFold(strings.TrimSpace(entry.Profile), profile) {
+			continue
+		}
+		entries = append(entries, entry)
+		if len(entries) == limit {
+			break
+		}
+	}
+	return entries
+}
+
+func commandStates(docs []atlas.CommandDoc) []atlas.ScanCommandState {
+	states := make([]atlas.ScanCommandState, 0, len(docs))
+	for _, doc := range docs {
+		states = append(states, atlas.ScanCommandState{
+			Name:      doc.Name,
+			Path:      doc.Path,
+			Summary:   doc.Summary,
+			ScannedAt: doc.ScannedAt,
+		})
+	}
+	return states
+}
+
+func newScanWarning(command string, err error) atlas.ScanWarning {
+	warning := atlas.ScanWarning{Command: command, Kind: "probe_failed", Message: err.Error()}
 	if errors.Is(err, exec.ErrNotFound) {
 		warning.Kind = "not_found"
 	}
 	return warning
 }
 
-func (w scanWarning) String() string {
+func formatScanWarning(w atlas.ScanWarning) string {
 	return fmt.Sprintf("%s [%s]: %s", w.Command, w.Kind, w.Message)
 }
 
@@ -754,6 +850,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  cmdatlas profiles delete NAME")
 	fmt.Fprintln(w, "  cmdatlas profiles export [NAME] --json")
 	fmt.Fprintln(w, "  cmdatlas profiles import [--replace] [--file PATH]")
+	fmt.Fprintln(w, "  cmdatlas history [--json] [--limit N] [--profile NAME]")
 	fmt.Fprintln(w, "  cmdatlas export --json")
 	fmt.Fprintln(w, "  cmdatlas completion [bash|zsh|fish|powershell]")
 	fmt.Fprintln(w, "  cmdatlas completion install [bash|zsh|fish|powershell]")

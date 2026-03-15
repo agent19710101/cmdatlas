@@ -115,6 +115,13 @@ cat profiles.json | cmdatlas profiles import --replace
 
 Import output now tells you whether each incoming profile was created, merged over a different local definition, replaced, or left unchanged, so team-sharing flows are easier to trust.
 
+Inspect persisted scan history for automation follow-up:
+
+```bash
+cmdatlas history --limit 5
+cmdatlas history --json --profile ops --limit 1
+```
+
 Export the stored index:
 
 ```bash
@@ -194,11 +201,44 @@ $ cmdatlas scan --json git go missing-tool
   "warnings": [
     "missing-tool [not_found]: executable file not found in $PATH"
   ],
+  "history_entry": {
+    "profile": "default",
+    "targets": ["git", "go"],
+    "summary": {
+      "added": ["git", "go"]
+    }
+  },
   "warning_details": [
     {
       "command": "missing-tool",
       "kind": "not_found",
       "message": "executable file not found in $PATH"
+    }
+  ]
+}
+```
+
+Example persisted history output:
+
+```bash
+$ cmdatlas history --json --limit 1
+{
+  "index_path": "/home/you/.config/cmdatlas/index.json",
+  "entries": [
+    {
+      "scanned_at": "2026-03-15T11:30:00Z",
+      "profile": "ops",
+      "targets": ["docker", "git", "kubectl"],
+      "summary": {
+        "added": ["kubectl"],
+        "updated": ["docker"],
+        "unchanged": ["git"]
+      },
+      "commands": [
+        {"name": "docker", "summary": "Docker CLI"},
+        {"name": "git", "summary": "distributed version control system"},
+        {"name": "kubectl", "summary": "Kubernetes command-line tool"}
+      ]
     }
   ]
 }
@@ -279,7 +319,7 @@ This keeps the binary small and the behavior predictable, but the parser will no
 
 ## Current Status
 
-- Latest release: `v0.17.3`
+- Latest release: `v0.18.0`
 - Stable local indexing/search/show/export flow is working.
 - `cmdatlas scan` now reports added, updated, unchanged, and stale commands so humans and agents can see what changed between rescans.
 - `cmdatlas scan` now preserves saved custom profiles instead of dropping them on rescan.
@@ -287,7 +327,8 @@ This keeps the binary small and the behavior predictable, but the parser will no
 - `cmdatlas profiles list` now shows whether each profile is built-in, custom, or imported (with source hints) and keeps non-installed commands visible, which makes shared profile definitions easier to review before scanning on a new machine.
 - `cmdatlas profiles export [NAME] --json` and `profiles import [--replace] [--file PATH]` now include optional provenance metadata plus conflict-aware import summaries, which makes custom profile sharing and machine bootstrap flows easier to trust.
 - `cmdatlas scan --profile NAME` works with both built-in profiles and custom local profiles for repeatable machine- or team-specific scans.
-- `cmdatlas scan --json` exposes scanned docs plus diff buckets for scripts and agents.
+- `cmdatlas scan --json` exposes scanned docs plus diff buckets for scripts and agents, and now includes the persisted history entry that was recorded for that scan.
+- `cmdatlas history [--json] [--limit N] [--profile NAME]` exposes durable scan snapshots so agents can ask what changed since the previous profile run without scraping human text.
 - Nested subcommand extraction now follows a small high-value CLI set (`git`, `gh`, `docker`, `kubectl`) far enough to capture practical command paths like `gh pr checks` and `git remote add`.
 - Explicit scan targets that point to executable paths containing spaces now probe correctly instead of being split into the wrong command/argument boundary.
 - Machine-readable `warning_details` now classify skipped scan targets like missing binaries versus probe failures, so scripts and agents can react without string parsing.
@@ -310,6 +351,7 @@ v0 ships these commands:
 - `cmdatlas profiles delete NAME`
 - `cmdatlas profiles export [NAME] --json`
 - `cmdatlas profiles import [--replace] [--file PATH]`
+- `cmdatlas history [--json] [--limit N] [--profile NAME]`
 - `cmdatlas export --json`
 - `cmdatlas completion [bash|zsh|fish|powershell]`
 - `cmdatlas completion install [bash|zsh|fish|powershell]`
@@ -322,7 +364,7 @@ Covered by tests:
 - index save/load round trips
 - atomic save failure preservation for the index store
 - scan diff/stale reporting across rescans
-- JSON output for `scan`, `search`, and `show`, including structured scan warning details
+- JSON output for `scan`, `search`, `show`, and `history`, including structured scan warning details and persisted scan snapshots
 - built-in and custom scan-profile selection plus completion suggestions for profile names
 - custom profile create/add/remove/list/delete/export/import flows and persistence in the local atlas store
 - completion script generation and unsupported-shell handling
@@ -331,7 +373,7 @@ Covered by tests:
 
 - expand nested command-graph coverage beyond the initial `git`/`gh`/`docker`/`kubectl` parser set
 - smarter parser strategies for additional popular CLIs and help layouts
-- scan-history snapshots so agents can automate follow-up on atlas changes
+- profile-aware history diffs and retention/export controls for longer-lived automation workflows
 - next likely UX step: richer warning categorization and profile-diff ergonomics for shared team workflows
 
 ## Release Plan
@@ -347,7 +389,7 @@ Planned release themes:
 
 - `v0.17.x` — expand parser coverage beyond the initial nested-command allowlist, improve help-layout handling, and harden release/CI guardrails.
 - `v0.18.x` — scan-history snapshots and change-aware automation hooks for agent workflows.
-- `v0.19.x` — richer warning categorization and profile-diff ergonomics for shared team workflows.
+- `v0.19.x` — richer warning categorization plus profile-diff ergonomics and longer-lived history controls for shared team workflows.
 
 ## License
 

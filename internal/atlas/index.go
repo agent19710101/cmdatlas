@@ -51,6 +51,8 @@ func Merge(existing Index, docs []CommandDoc, scannedSet []string) Index {
 		}
 	}
 
+	history := append([]ScanSnapshot(nil), existing.History...)
+
 	return Index{
 		Version:     CurrentIndexVersion,
 		Generated:   time.Now().UTC(),
@@ -58,6 +60,7 @@ func Merge(existing Index, docs []CommandDoc, scannedSet []string) Index {
 		ScannedSet:  scannedSet,
 		Profiles:    profiles,
 		ProfileMeta: profileMeta,
+		History:     history,
 	}
 }
 
