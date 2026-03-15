@@ -352,17 +352,52 @@ func runProfiles(args []string, stdout io.Writer) error {
 		if len(args) < 3 {
 			return errors.New("usage: cmdatlas profiles set NAME COMMAND [COMMAND ...]")
 		}
-		index, err = atlas.SetProfile(index, args[1], args[2:])
+		name := strings.ToLower(strings.TrimSpace(args[1]))
+		index, err = atlas.SetProfile(index, name, args[2:])
 		if err != nil {
 			return err
 		}
 		if err := atlas.Save(indexPath, index); err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "Saved profile %s: %s\n", strings.ToLower(strings.TrimSpace(args[1])), strings.Join(index.Profiles[strings.ToLower(strings.TrimSpace(args[1]))], ", "))
+		fmt.Fprintf(stdout, "Saved profile %s: %s\n", name, strings.Join(index.Profiles[name], ", "))
 		fmt.Fprintf(stdout, "Saved index: %s\n", indexPath)
 		return nil
-	case "delete", "rm", "remove":
+	case "add":
+		if len(args) < 3 {
+			return errors.New("usage: cmdatlas profiles add NAME COMMAND [COMMAND ...]")
+		}
+		name := strings.ToLower(strings.TrimSpace(args[1]))
+		var added []string
+		index, added, err = atlas.AddToProfile(index, name, args[2:])
+		if err != nil {
+			return err
+		}
+		if err := atlas.Save(indexPath, index); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "Updated profile %s: %s\n", name, strings.Join(index.Profiles[name], ", "))
+		fmt.Fprintf(stdout, "Added: %s\n", noneIfEmpty(added))
+		fmt.Fprintf(stdout, "Saved index: %s\n", indexPath)
+		return nil
+	case "remove", "rm":
+		if len(args) < 3 {
+			return errors.New("usage: cmdatlas profiles remove NAME COMMAND [COMMAND ...]")
+		}
+		name := strings.ToLower(strings.TrimSpace(args[1]))
+		var removed []string
+		index, removed, err = atlas.RemoveFromProfile(index, name, args[2:])
+		if err != nil {
+			return err
+		}
+		if err := atlas.Save(indexPath, index); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "Updated profile %s: %s\n", name, strings.Join(index.Profiles[name], ", "))
+		fmt.Fprintf(stdout, "Removed: %s\n", noneIfEmpty(removed))
+		fmt.Fprintf(stdout, "Saved index: %s\n", indexPath)
+		return nil
+	case "delete":
 		if len(args) != 2 {
 			return errors.New("usage: cmdatlas profiles delete NAME")
 		}
@@ -461,6 +496,15 @@ func splitCSV(values []string) []string {
 	return dedupe(parts)
 }
 
+func noneIfEmpty(values []string) string {
+	if len(values) == 0 {
+		return "none"
+	}
+	sorted := append([]string(nil), values...)
+	sort.Strings(sorted)
+	return strings.Join(sorted, ", ")
+}
+
 func firstNonEmpty(value string, fallback string) string {
 	if strings.TrimSpace(value) == "" {
 		return fallback
@@ -478,6 +522,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  cmdatlas annotate [--alias NAME] [--tag NAME] [--note TEXT] COMMAND")
 	fmt.Fprintln(w, "  cmdatlas profiles list")
 	fmt.Fprintln(w, "  cmdatlas profiles set NAME COMMAND [COMMAND ...]")
+	fmt.Fprintln(w, "  cmdatlas profiles add NAME COMMAND [COMMAND ...]")
+	fmt.Fprintln(w, "  cmdatlas profiles remove NAME COMMAND [COMMAND ...]")
 	fmt.Fprintln(w, "  cmdatlas profiles delete NAME")
 	fmt.Fprintln(w, "  cmdatlas export --json")
 	fmt.Fprintln(w, "  cmdatlas completion [bash|zsh|fish|powershell]")

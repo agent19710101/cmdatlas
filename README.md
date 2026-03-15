@@ -291,8 +291,17 @@ Covered by tests:
 - richer subcommand graphing with nested command paths
 - smarter parser strategies for popular CLIs
 - scan-history snapshots so agents can automate follow-up on atlas changes
-- next likely UX step: editing/merging profile contents without full replacement, plus richer machine-readable scan warnings
+- next likely UX step: richer machine-readable scan warnings plus more advanced profile import/share flows
 
 ## License
+
+MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
+readable scan warnings
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+se
 
 MIT. See [LICENSE](LICENSE).

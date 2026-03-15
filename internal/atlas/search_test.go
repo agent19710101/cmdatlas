@@ -1,6 +1,9 @@
 package atlas
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestSearchRanksNameBeforeHelpText(t *testing.T) {
 	index := Index{
@@ -115,5 +118,44 @@ func TestSetAnnotationsNormalizesValues(t *testing.T) {
 	}
 	if len(got.Notes) != 2 || got.Notes[0] != "note" || got.Notes[1] != "other" {
 		t.Fatalf("notes = %#v, want normalized values", got.Notes)
+	}
+}
+
+func TestAddToProfileMergesWithoutReplacing(t *testing.T) {
+	index := Index{Profiles: map[string][]string{"team": {"git", "go"}}}
+
+	updated, added, err := AddToProfile(index, "team", []string{"gh", "go"})
+	if err != nil {
+		t.Fatalf("AddToProfile() error = %v", err)
+	}
+	if got := strings.Join(updated.Profiles["team"], ","); got != "gh,git,go" {
+		t.Fatalf("profile commands = %q", got)
+	}
+	if got := strings.Join(added, ","); got != "gh" {
+		t.Fatalf("added = %q", got)
+	}
+}
+
+func TestRemoveFromProfileKeepsRemainingCommands(t *testing.T) {
+	index := Index{Profiles: map[string][]string{"team": {"gh", "git", "go"}}}
+
+	updated, removed, err := RemoveFromProfile(index, "team", []string{"gh", "missing"})
+	if err != nil {
+		t.Fatalf("RemoveFromProfile() error = %v", err)
+	}
+	if got := strings.Join(updated.Profiles["team"], ","); got != "git,go" {
+		t.Fatalf("profile commands = %q", got)
+	}
+	if got := strings.Join(removed, ","); got != "gh" {
+		t.Fatalf("removed = %q", got)
+	}
+}
+
+func TestRemoveFromProfileRejectsEmptyProfile(t *testing.T) {
+	index := Index{Profiles: map[string][]string{"team": {"git"}}}
+
+	_, _, err := RemoveFromProfile(index, "team", []string{"git"})
+	if err == nil {
+		t.Fatal("expected error when removing last command")
 	}
 }

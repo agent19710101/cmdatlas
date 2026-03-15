@@ -123,10 +123,10 @@ func TestRunCompletionScripts(t *testing.T) {
 		args []string
 		want []string
 	}{
-		{name: "bash", args: []string{"completion", "bash"}, want: []string{"complete -F _cmdatlas_completion cmdatlas", "bash zsh fish powershell", "--alias --tag --note", "scan|search|export", "profiles", "--json --profile", "default dev ops shell"}},
-		{name: "zsh", args: []string{"completion", "zsh"}, want: []string{"#compdef cmdatlas", "annotate:add aliases, tags, and notes to an indexed command", "profiles:list, save, or delete custom scan profiles", "scan:scan commands into the local atlas", "--json[emit JSON]", "--profile[scan a named command profile]", "default dev ops shell"}},
-		{name: "fish", args: []string{"completion", "fish"}, want: []string{"complete -c cmdatlas", "__cmdatlas_index_commands", "-l alias -d 'add a local alias'", "__fish_seen_subcommand_from scan search export show", "-l json -d 'emit JSON'", "-l profile -d 'scan a named command profile' -a 'default dev ops shell'", "__fish_seen_subcommand_from profiles' -a 'list set delete'"}},
-		{name: "powershell", args: []string{"completion", "powershell"}, want: []string{"Register-ArgumentCompleter", "Get-CmdAtlasIndexedCommands", "'scan'", "'profiles'", "'--json', '--profile'", "$scanProfiles = @('default', 'dev', 'ops', 'shell')"}},
+		{name: "bash", args: []string{"completion", "bash"}, want: []string{"complete -F _cmdatlas_completion cmdatlas", "bash zsh fish powershell", "--alias --tag --note", "scan|search|export", "profiles", "list set add remove delete", "--json --profile", "default", "dev", "ops", "shell"}},
+		{name: "zsh", args: []string{"completion", "zsh"}, want: []string{"#compdef cmdatlas", "annotate:add aliases, tags, and notes to an indexed command", "profiles:list, save, edit, or delete custom scan profiles", "scan:scan commands into the local atlas", "--json[emit JSON]", "--profile[scan a named command profile]", "list set add remove delete", "default", "dev", "ops", "shell"}},
+		{name: "fish", args: []string{"completion", "fish"}, want: []string{"complete -c cmdatlas", "__cmdatlas_index_commands", "-l alias -d 'add a local alias'", "__fish_seen_subcommand_from scan search export show", "-l json -d 'emit JSON'", "-l profile -d 'scan a named command profile'", "default", "dev", "ops", "shell", "__fish_seen_subcommand_from profiles' -a 'list set add remove delete'"}},
+		{name: "powershell", args: []string{"completion", "powershell"}, want: []string{"Register-ArgumentCompleter", "Get-CmdAtlasIndexedCommands", "'scan'", "'profiles'", "'list', 'set', 'add', 'remove', 'delete'", "'--json', '--profile'", "$scanProfiles = @('default'", "'dev'", "'ops'", "'shell'"}},
 	}
 
 	for _, tc := range tests {
@@ -156,6 +156,36 @@ func TestRunScanRejectsProfileWithExplicitTargets(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "either explicit COMMAND arguments or --profile") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunProfilesAddAndRemove(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"profiles", "set", "team", "git", "go"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run(profiles set) returned error: %v", err)
+	}
+
+	stdout.Reset()
+	if err := Run([]string{"profiles", "add", "team", "gh", "go"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run(profiles add) returned error: %v", err)
+	}
+	for _, want := range []string{"Updated profile team: gh, git, go", "Added: gh"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected profiles add output to contain %q, got %q", want, stdout.String())
+		}
+	}
+
+	stdout.Reset()
+	if err := Run([]string{"profiles", "remove", "team", "git"}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("Run(profiles remove) returned error: %v", err)
+	}
+	for _, want := range []string{"Updated profile team: gh, go", "Removed: git"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected profiles remove output to contain %q, got %q", want, stdout.String())
+		}
 	}
 }
 

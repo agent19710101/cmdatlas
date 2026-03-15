@@ -94,7 +94,7 @@ _cmdatlas_completion() {
             return 0
             ;;
         profiles)
-            COMPREPLY=( $(compgen -W "list set delete" -- "$cur") )
+            COMPREPLY=( $(compgen -W "list set add remove delete" -- "$cur") )
             return 0
             ;;
         show)
@@ -132,7 +132,7 @@ _cmdatlas_completion() {
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
             ;;
         profiles)
-            COMPREPLY=( $(compgen -W "list set delete" -- "$cur") )
+            COMPREPLY=( $(compgen -W "list set add remove delete" -- "$cur") )
             ;;
         annotate)
             if [[ "$cur" == --* ]]; then
@@ -181,7 +181,7 @@ _cmdatlas() {
     'search:search the local atlas'
     'show:show one indexed command'
     'annotate:add aliases, tags, and notes to an indexed command'
-    'profiles:list, save, or delete custom scan profiles'
+    'profiles:list, save, edit, or delete custom scan profiles'
     'export:export the atlas as JSON'
     'completion:print shell completion scripts'
     'help:show help'
@@ -197,7 +197,7 @@ _cmdatlas() {
       return
       ;;
     profiles)
-      _arguments '1:action:(list set delete)'
+      _arguments '1:action:(list set add remove delete)'
       return
       ;;
     show)
@@ -231,7 +231,7 @@ _cmdatlas() {
       _arguments '--json[emit JSON]'
       ;;
     profiles)
-      _arguments '1:action:(list set delete)'
+      _arguments '1:action:(list set add remove delete)'
       ;;
     show)
       _arguments '--json[emit JSON]' '1:indexed command:_cmdatlas_index_commands'
@@ -284,7 +284,7 @@ complete -c cmdatlas -f -n '__fish_seen_subcommand_from scan' -l profile -d 'sca
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from annotate' -l alias -d 'add a local alias'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from annotate' -l tag -d 'add a local tag'
 complete -c cmdatlas -f -n '__fish_seen_subcommand_from annotate' -l note -d 'add a local note'
-complete -c cmdatlas -f -n '__fish_seen_subcommand_from profiles' -a 'list set delete'
+complete -c cmdatlas -f -n '__fish_seen_subcommand_from profiles' -a 'list set add remove delete'
 `, profiles)
 }
 
@@ -372,7 +372,7 @@ func powershellCompletionScript() string {
             }
         }
         'profiles' {
-            @('list', 'set', 'delete') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+            @('list', 'set', 'add', 'remove', 'delete') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
                 [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
             }
         }
