@@ -27,12 +27,22 @@ func preferredShellProfile(shell string, configDir string) string {
 	case "powershell":
 		base := filepath.Join(configDir, "powershell")
 		if runtime.GOOS == "windows" {
-			base = filepath.Join(filepath.Dir(configDir), "Documents", "PowerShell")
+			base = windowsPowerShellDir(configDir)
 		}
 		return filepath.Join(base, "Microsoft.PowerShell_profile.ps1")
 	default:
 		return ""
 	}
+}
+
+func windowsPowerShellDir(configDir string) string {
+	if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
+		return filepath.Join(home, "Documents", "PowerShell")
+	}
+	if profile := strings.TrimSpace(os.Getenv("USERPROFILE")); profile != "" {
+		return filepath.Join(profile, "Documents", "PowerShell")
+	}
+	return filepath.Join(filepath.Dir(configDir), "Documents", "PowerShell")
 }
 
 func installCompletion(shell string) (completionInstallTarget, error) {
@@ -74,7 +84,7 @@ func installCompletion(shell string) (completionInstallTarget, error) {
 	case "powershell":
 		base := filepath.Join(configDir, "powershell", "Completions")
 		if runtime.GOOS == "windows" {
-			base = filepath.Join(filepath.Dir(configDir), "Documents", "PowerShell", "Completions")
+			base = filepath.Join(windowsPowerShellDir(configDir), "Completions")
 		}
 		path := filepath.Join(base, "cmdatlas.ps1")
 		profile := preferredShellProfile(shell, configDir)
