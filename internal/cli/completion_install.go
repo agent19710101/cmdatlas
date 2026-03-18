@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/agent19710101/cmdatlas/internal/atlas"
 )
 
 type completionInstallTarget struct {
@@ -34,7 +36,7 @@ func preferredShellProfile(shell string, configDir string) string {
 }
 
 func installCompletion(shell string) (completionInstallTarget, error) {
-	configDir, err := os.UserConfigDir()
+	configDir, err := atlas.UserConfigDir()
 	if err != nil {
 		return completionInstallTarget{}, err
 	}

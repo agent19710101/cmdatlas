@@ -6,12 +6,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var renameFile = os.Rename
 
+func UserConfigDir() (string, error) {
+	if dir := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); dir != "" {
+		return dir, nil
+	}
+	return os.UserConfigDir()
+}
+
 func DefaultIndexPath() (string, error) {
-	dir, err := os.UserConfigDir()
+	dir, err := UserConfigDir()
 	if err != nil {
 		return "", err
 	}
