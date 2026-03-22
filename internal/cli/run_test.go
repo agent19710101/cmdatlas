@@ -423,8 +423,9 @@ func TestRunCompletionInstallWritesPowerShellScript(t *testing.T) {
 	installedPath := filepath.Join(configHome, "powershell", "Completions", "cmdatlas.ps1")
 	profilePath := filepath.Join(configHome, "powershell", "Microsoft.PowerShell_profile.ps1")
 	if runtime.GOOS == "windows" {
-		installedPath = filepath.Join(filepath.Dir(configHome), "Documents", "PowerShell", "Completions", "cmdatlas.ps1")
-		profilePath = filepath.Join(filepath.Dir(configHome), "Documents", "PowerShell", "Microsoft.PowerShell_profile.ps1")
+		base := windowsPowerShellDir(configHome)
+		installedPath = filepath.Join(base, "Completions", "cmdatlas.ps1")
+		profilePath = filepath.Join(base, "Microsoft.PowerShell_profile.ps1")
 	}
 
 	data, err := os.ReadFile(installedPath)
@@ -465,7 +466,7 @@ func TestPreferredShellProfile(t *testing.T) {
 	}
 	wantPowerShell := filepath.Join(configHome, "powershell", "Microsoft.PowerShell_profile.ps1")
 	if runtime.GOOS == "windows" {
-		wantPowerShell = filepath.Join(filepath.Dir(configHome), "Documents", "PowerShell", "Microsoft.PowerShell_profile.ps1")
+		wantPowerShell = filepath.Join(windowsPowerShellDir(configHome), "Microsoft.PowerShell_profile.ps1")
 	}
 	if got := preferredShellProfile("powershell", configHome); got != wantPowerShell {
 		t.Fatalf("powershell profile = %q, want %q", got, wantPowerShell)
